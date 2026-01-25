@@ -13,23 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { router } from './router';
-import './index.css';
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('Could not find root element to mount to');
+import React from 'react';
+
+interface LoadingSpinnerProps {
+  size?: 'sm' | 'md' | 'lg';
+  color?: string;
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
-  </React.StrictMode>,
-);
+export function LoadingSpinner({ size = 'md', color }: LoadingSpinnerProps) {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12',
+  };
+
+  const spinnerColor = color || 'var(--jandi-light-blue)';
+
+  return (
+    <div className="flex items-center justify-center">
+      <div
+        className={`${sizeClasses[size]} animate-spin rounded-full border-2 border-t-transparent`}
+        style={{ borderColor: `${spinnerColor} transparent ${spinnerColor} ${spinnerColor}` }}
+      />
+    </div>
+  );
+}

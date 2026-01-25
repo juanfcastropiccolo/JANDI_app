@@ -15,6 +15,7 @@
 """UCP."""
 
 import logging
+import os
 from typing import Any
 from a2a.types import TaskState
 from a2a.utils import get_message_text
@@ -38,7 +39,16 @@ from .constants import (
 )
 from .payment_processor import MockPaymentProcessor
 from .store import RetailStore
+from .tools import (
+    get_business_catalog,
+    search_products_across_businesses,
+    create_checkout_session as create_checkout_session_supabase,
+    complete_checkout_order,
+    get_user_preferences,
+    get_order_status,
+)
 
+from .prompt import get_user_profile, build_jandi_system_prompt
 
 store = RetailStore()
 mpp = MockPaymentProcessor()
@@ -434,34 +444,40 @@ def modify_output_after_agent(
     return None
 
 
-root_agent = Agent(
-    name="shopper_agent",
-    model="gemini-3-flash-preview",
-    description="Agent to help with shopping",
-    instruction=(
-        "You are a helpful agent who can help user with shopping actions such"
-        " as searching the catalog, add to checkout session, complete checkout"
-        " and handle order placed event.Given the user ask, plan ahead and"
-        " invoke the tools available to complete the user's ask. Always make"
-        " sure you have completed all aspects of the user's ask. If the user"
-        " says add to my list or remove from the list, add or remove from the"
-        " cart, add the product or remove the product from the checkout"
-        " session. If the user asks to add any items to the checkout session,"
-        " search for the products and then add the matching products to"
-        " checkout session.If the user asks to replace products,"
-        " use remove_from_checkout and add_to_checkout tools to replace the"
-        " products to match the user request"
-    ),
-    tools=[
-        search_shopping_catalog,
-        add_to_checkout,
-        remove_from_checkout,
-        update_checkout,
-        get_checkout,
-        start_payment,
-        update_customer_details,
-        complete_checkout,
-    ],
-    after_tool_callback=after_tool_modifier,
-    after_agent_callback=modify_output_after_agent,
-)
+def create_jandi_agent(user_id: str | None = None):
+    user_id = user_id or os.getenv("JANDI_USER_ID") or os.getenv("USER_ID") or ""
+
+    profile = get_user_profile(user_id)
+
+    JANDI_PROMPT = build_jandi_system_prompt(profile)
+
+    root_agent = Agent(
+        name="jandi_business_agent",
+        model="gemini-2.0-flash-exp",
+        description="JANDI - Asistente inteligente de compras con acceso a múltiples negocios",
+        instruction=JANDI_PROMPT,
+        tools=[
+            # Herramientas originales de UCP (mantener compatibilidad)
+            search_shopping_catalog,
+            add_to_checkout,
+            remove_from_checkout,
+            update_checkout,
+            get_checkout,
+            start_payment,
+            update_customer_details,
+            complete_checkout,
+            # Nuevas herramientas con Supabase (adicionales)
+            get_business_catalog,
+            search_products_across_businesses,
+            create_checkout_session_supabase,
+            complete_checkout_order,
+            get_user_preferences,
+            get_order_status,
+        ],
+        after_tool_callback=after_tool_modifier,
+        after_agent_callback=modify_output_after_agent,
+    )
+
+    return root_agent
+
+root_agent = create_jandi_agent()

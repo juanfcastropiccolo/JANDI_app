@@ -1,0 +1,21 @@
+# Python
+business_agent/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/.python-version
+
+# Documentation
+documentation/
+*.md
+!README.md
+
+# Assets
+assets/
+
+# SQL
+*.sql
+
+# Local env files (usar las variables de Vercel en su lugar)
+.env.local
+.env*.local

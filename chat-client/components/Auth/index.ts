@@ -13,23 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { router } from './router';
-import './index.css';
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('Could not find root element to mount to');
-}
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
-  </React.StrictMode>,
-);
+export { LandingPage } from './LandingPage';
+export { LoginForm } from './LoginForm';
+export { RegisterForm } from './RegisterForm';
+export { GoogleAuthButton } from './GoogleAuthButton';
+export { ForgotPassword } from './ForgotPassword';
+export { AuthLayout } from './AuthLayout';
+export { AuthCallback } from './AuthCallback';
+export { AuthCallbackSimple } from './AuthCallbackSimple';

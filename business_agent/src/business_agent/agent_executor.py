@@ -15,7 +15,10 @@
 """UCP."""
 
 import json
+import logging
+import os
 import re
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from typing import Any
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -26,7 +29,7 @@ from a2a.utils import (
     new_agent_text_message,
 )
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
+from google.adk.sessions import DatabaseSessionService, InMemorySessionService
 from google.genai import types
 from ucp_sdk.models.schemas.shopping.types.payment_instrument import (
     PaymentInstrument,
@@ -110,10 +113,47 @@ class ADKAgentExecutor(AgentExecutor):
 
         """
         self.agent = agent
+        self._logger = logging.getLogger(__name__)
+
+        # Persistencia de sesiones (por defecto in-memory). Si hay DB,
+        # usamos SQLAlchemy + psycopg para Postgres (Supabase).
+        session_service = InMemorySessionService()
+        session_db_url = os.getenv("SESSION_DB_URL")
+        if session_db_url:
+            try:
+                normalized_db_url = session_db_url
+                if normalized_db_url.startswith("postgres://"):
+                    normalized_db_url = (
+                        "postgresql://" + normalized_db_url[len("postgres://") :]
+                    )
+                if normalized_db_url.startswith("postgresql://") and "postgresql+" not in normalized_db_url:
+                    normalized_db_url = (
+                        "postgresql+psycopg://"
+                        + normalized_db_url[len("postgresql://") :]
+                    )
+
+                # Supabase requiere SSL para conexiones directas.
+                parsed = urlparse(normalized_db_url)
+                hostname = (parsed.hostname or "").lower()
+                if hostname.endswith(".supabase.co"):
+                    qs = dict(parse_qsl(parsed.query, keep_blank_values=True))
+                    if "sslmode" not in qs:
+                        qs["sslmode"] = "require"
+                        parsed = parsed._replace(query=urlencode(qs))
+                        normalized_db_url = urlunparse(parsed)
+
+                session_service = DatabaseSessionService(db_url=normalized_db_url)
+                self._logger.info("Session persistence enabled via DatabaseSessionService")
+            except Exception as e:
+                self._logger.warning(
+                    "Failed to initialize DatabaseSessionService (%s). Falling back to in-memory sessions.",
+                    e,
+                )
+
         self.runner = Runner(
             app_name=agent.name,
             agent=agent,
-            session_service=InMemorySessionService(),
+            session_service=session_service,
         )
         self.extensions = extensions or []
         self.profile_resolver = ProfileResolver()

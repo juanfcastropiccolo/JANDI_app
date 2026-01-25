@@ -13,23 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { RouterProvider } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { router } from './router';
-import './index.css';
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('Could not find root element to mount to');
+import React, { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuthContext } from '../contexts/AuthContext';
+
+interface OnboardingGuardProps {
+  children: ReactNode;
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
-  </React.StrictMode>,
-);
+export function OnboardingGuard({ children }: OnboardingGuardProps) {
+  const { user } = useAuthContext();
+
+  // Si el usuario no completó el onboarding, redirigir
+  if (user && !user.onboarding_completed) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return <>{children}</>;
+}
