@@ -69,8 +69,8 @@ const CheckoutComponent: React.FC<CheckoutProps> = ({
             />
           </svg>
           {checkout.status === 'completed'
-            ? 'Order Confirmed'
-            : 'Checkout Summary'}
+            ? 'Orden confirmada'
+            : 'Resumen Final'}
         </h3>
         {checkout.order?.id && (
           <p className="border-b pt-3 pb-3 text-sm space-y-2">
@@ -147,7 +147,7 @@ const CheckoutComponent: React.FC<CheckoutProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
-                Go to Checkout
+                Ir al carrito
               </a>
             )}
             {onCheckout && (
@@ -155,7 +155,7 @@ const CheckoutComponent: React.FC<CheckoutProps> = ({
                 type="button"
                 onClick={onCheckout}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm">
-                Start Payment
+                Pagar
               </button>
             )}
             {onCompletePayment && (
@@ -163,7 +163,7 @@ const CheckoutComponent: React.FC<CheckoutProps> = ({
                 type="button"
                 onClick={() => onCompletePayment?.(checkout)}
                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">
-                Complete Payment
+                Confirmar pago
               </button>
             )}
           </div>
@@ -172,7 +172,7 @@ const CheckoutComponent: React.FC<CheckoutProps> = ({
           <a
             href={checkout.order.permalink_url}
             className="block mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center">
-            View Order
+            Ver orden
           </a>
         )}
       </div>

@@ -46,7 +46,7 @@ const ProductCard: React.FC<ProductCardProps> = ({product, onAddToCart}) => {
           </p>
           <span
             className={`px-2 py-1 text-xs font-semibold rounded-full ${isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {isAvailable ? 'In Stock' : 'Out of Stock'}
+            {isAvailable ? 'En Stock' : 'Fuera de Stock'}
           </span>
         </div>
         <button
@@ -54,7 +54,7 @@ const ProductCard: React.FC<ProductCardProps> = ({product, onAddToCart}) => {
           onClick={handleAddToCartClick}
           disabled={!isAvailable || !onAddToCart}
           className="block w-full text-center bg-blue-500 text-white py-2 rounded-md mt-4 hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
-          Add to Checkout
+          Agregar al carrito
         </button>
       </div>
     </div>

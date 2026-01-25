@@ -12,8 +12,8 @@
       "name": "CookieCo"
     },
     "offers": {
-      "price": "4.99",
-      "priceCurrency": "USD",
+      "price": "6800",
+      "priceCurrency": "ARS",
       "priceSpecification": null,
       "@type": "Offer",
       "availability": "https://schema.org/InStock",
@@ -119,8 +119,8 @@
       "name": "CookieCo"
     },
     "offers": {
-      "price": "5.99",
-      "priceCurrency": "USD",
+      "price": "7200",
+      "priceCurrency": "ARS",
       "priceSpecification": null,
       "@type": "Offer",
       "availability": "https://schema.org/InStock",

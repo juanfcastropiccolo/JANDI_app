@@ -90,7 +90,7 @@ function ConversationList({
             opacity: 0.5,
           }}
         >
-          🔍
+          🤙
         </div>
         <h3
           className="text-lg font-medium mb-2"
@@ -98,7 +98,7 @@ function ConversationList({
             color: 'var(--jandi-white)',
           }}
         >
-          No se encontraron resultados
+          Crea un nuevo chat para comenzar
         </h3>
         <p
           className="text-sm"
@@ -107,7 +107,7 @@ function ConversationList({
             opacity: 0.7,
           }}
         >
-          Intenta con otros términos de búsqueda
+          Tus nuevas conversaciones apareceran acá
         </p>
       </div>
     );

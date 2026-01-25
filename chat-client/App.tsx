@@ -74,6 +74,7 @@ function AppContent() {
     removeItem,
     updateQuantity,
     toggleCart,
+    openCart,
     closeCart,
     toggleConfirmation,
     clearCart,
@@ -99,25 +100,44 @@ function AppContent() {
 
   // Usar ref para evitar loops de sincronización
   const isUpdatingFromContext = useRef(false);
+  const lastSavedMessages = useRef<ChatMessage[]>([]);
+  const isSendingMessage = useRef(false);
+  const lastSyncedCheckoutId = useRef<string | null>(null);
 
   // Sincronizar mensajes cuando cambia la conversación
   useEffect(() => {
+    // No sincronizar si estamos en medio de enviar un mensaje
+    if (isSendingMessage.current) {
+      console.log('🔍 Sincronización bloqueada: enviando mensaje');
+      return;
+    }
+    
+    console.log('🔍 Sincronizando mensajes desde contexto para conversación:', currentConversationId);
     isUpdatingFromContext.current = true;
-    setMessages(getCurrentMessages());
+    const contextMessages = getCurrentMessages();
+    console.log('🔍 Mensajes del contexto:', contextMessages.length);
+    setMessages(contextMessages);
+    lastSavedMessages.current = contextMessages;
+    
+    // Resetear el último checkout sincronizado cuando cambia la conversación
+    lastSyncedCheckoutId.current = null;
+    
     // Pequeño delay para permitir que el render se complete
     setTimeout(() => {
       isUpdatingFromContext.current = false;
     }, 0);
-  }, [currentConversationId, getCurrentMessages]);
+  }, [currentConversationId]);
 
   // Guardar mensajes en el context cuando cambian (pero no durante sincronización)
-  // Usar un pequeño debounce para evitar actualizaciones muy frecuentes
+  // Guardar inmediatamente sin debounce para evitar pérdida de mensajes
   useEffect(() => {
     if (!isUpdatingFromContext.current && currentConversationId && messages.length > 0) {
-      const timeoutId = setTimeout(() => {
+      // Solo actualizar si los mensajes realmente cambiaron
+      const messagesChanged = JSON.stringify(messages) !== JSON.stringify(lastSavedMessages.current);
+      if (messagesChanged) {
+        lastSavedMessages.current = messages;
         updateConversationMessages(currentConversationId, messages);
-      }, 100);
-      return () => clearTimeout(timeoutId);
+      }
     }
   }, [messages, currentConversationId, updateConversationMessages]);
 
@@ -132,6 +152,71 @@ function AppContent() {
   const isEmptyConversation = useMemo(() => {
     return messages.length === 0;
   }, [messages]);
+
+  // Sincronizar carrito con el checkout más reciente de JANDI
+  useEffect(() => {
+    // Buscar el último mensaje con checkout
+    const lastCheckoutMessage = messages
+      .slice()
+      .reverse()
+      .find(m => m.checkout);
+
+    if (lastCheckoutMessage?.checkout) {
+      const checkout = lastCheckoutMessage.checkout;
+      
+      // Solo sincronizar si es un checkout nuevo que no hemos procesado
+      if (checkout.id === lastSyncedCheckoutId.current) {
+        return;
+      }
+
+      console.log('🛒 Nuevo checkout detectado:', checkout.id, 'Status:', checkout.status);
+      lastSyncedCheckoutId.current = checkout.id;
+      
+      // Si el checkout está completado, limpiar el carrito
+      if (checkout.status === 'completed') {
+        console.log('🛒 Checkout completado, limpiando carrito');
+        clearCart();
+        return;
+      }
+      
+      // Convertir line_items del checkout a productos del carrito
+      const checkoutProducts: Map<string, {product: Product, quantity: number}> = new Map();
+      
+      checkout.line_items.forEach(lineItem => {
+        // Crear un Product compatible desde el CheckoutItem
+        const product: Product = {
+          productID: lineItem.item.id,
+          name: lineItem.item.title,
+          image: [lineItem.item.image_url],
+          brand: { name: '' }, // No disponible en checkout
+          offers: {
+            price: (lineItem.item.price / 100).toString(), // Convertir de centavos a dólares
+            priceCurrency: checkout.currency,
+            availability: 'InStock',
+          },
+          url: '',
+          description: '',
+          size: { name: '' },
+        };
+        
+        checkoutProducts.set(lineItem.item.id, {
+          product,
+          quantity: lineItem.quantity,
+        });
+      });
+
+      // Sincronizar con el carrito local
+      console.log('🛒 Sincronizando carrito con checkout de JANDI');
+      
+      // Limpiar carrito actual
+      clearCart();
+      
+      // Agregar todos los productos del checkout
+      checkoutProducts.forEach(({product, quantity}) => {
+        addItem(product, quantity);
+      });
+    }
+  }, [messages, clearCart, addItem]); // Dependencias necesarias
 
   // Modo de interacción: solo texto (modo voz desactivado)
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('text');
@@ -178,6 +263,11 @@ function AppContent() {
   const handleAddToCheckout = (productToAdd: Product) => {
     // Agregar al carrito local
     addItem(productToAdd, 1);
+    
+    // Abrir el carrito automáticamente para mostrar el producto agregado
+    setTimeout(() => {
+      openCart();
+    }, 300); // Pequeño delay para mejor UX
     
     // También enviar al agente (lógica existente)
     const actionPayload = JSON.stringify({
@@ -328,6 +418,9 @@ function AppContent() {
   ) => {
     if (isLoading) return;
 
+    // Marcar que estamos enviando un mensaje para evitar sincronización durante el proceso
+    isSendingMessage.current = true;
+
     const userMessage = createChatMessage(
       Sender.USER,
       options?.isUserAction
@@ -407,15 +500,23 @@ function AppContent() {
       }
 
       const data = await response.json();
+      
+      // Debug: Log la respuesta completa
+      console.log('🔍 Respuesta completa del backend:', data);
+      console.log('🔍 data.result:', data.result);
+      console.log('🔍 data.result?.parts:', data.result?.parts);
+      console.log('🔍 data.result?.status?.message?.parts:', data.result?.status?.message?.parts);
 
       // Update context and task IDs from the response for subsequent requests
       if (data.result?.contextId) {
         setContextId(data.result.contextId);
       }
       //if there is a task and it's in one of the active states
+      const activeStates = ['working', 'submitted', 'input-required'];
       if (
         data.result?.id &&
-        data.result?.status?.state in ['working', 'submitted', 'input-required']
+        data.result?.status?.state &&
+        activeStates.includes(data.result.status.state)
       ) {
         setTaskId(data.result.id);
       } else {
@@ -427,12 +528,16 @@ function AppContent() {
 
       const responseParts =
         data.result?.parts || data.result?.status?.message?.parts || [];
+      
+      console.log('🔍 responseParts procesadas:', responseParts);
 
       for (const part of responseParts) {
+        console.log('🔍 Procesando part:', part);
         if (part.text) {
           // Simple text
           combinedBotMessage.text +=
             (combinedBotMessage.text ? '\n' : '') + part.text;
+          console.log('🔍 Texto agregado:', part.text);
         } else if (part.data?.['a2a.product_results']) {
           // Product results
           combinedBotMessage.text +=
@@ -440,24 +545,41 @@ function AppContent() {
             (part.data['a2a.product_results'].content || '');
           combinedBotMessage.products =
             part.data['a2a.product_results'].results;
+          console.log('🔍 Productos agregados');
         } else if (part.data?.['a2a.ucp.checkout']) {
           // Checkout
           combinedBotMessage.checkout = part.data['a2a.ucp.checkout'];
+          console.log('🔍 Checkout agregado');
         }
       }
+
+      console.log('🔍 Mensaje combinado final:', combinedBotMessage);
 
       const newMessages: ChatMessage[] = [];
       const hasContent =
         combinedBotMessage.text ||
         combinedBotMessage.products ||
         combinedBotMessage.checkout;
+      console.log('🔍 hasContent:', hasContent);
+      console.log('🔍 combinedBotMessage.text:', combinedBotMessage.text);
+      
       if (hasContent) {
         newMessages.push(combinedBotMessage);
+        console.log('🔍 Mensaje agregado a newMessages');
       }
 
+      console.log('🔍 newMessages.length:', newMessages.length);
+      
       if (newMessages.length > 0) {
-        setMessages((prev) => [...prev.slice(0, -1), ...newMessages]);
+        console.log('🔍 Actualizando mensajes con respuesta del bot');
+        setMessages((prev) => {
+          console.log('🔍 Mensajes previos:', prev.length);
+          const updated = [...prev.slice(0, -1), ...newMessages];
+          console.log('🔍 Mensajes actualizados:', updated.length);
+          return updated;
+        });
       } else {
+        console.log('🔍 No hay contenido, mostrando mensaje de fallback');
         const fallbackResponse =
           "Sorry, I received a response I couldn't understand.";
         setMessages((prev) => [
@@ -475,6 +597,8 @@ function AppContent() {
       setMessages((prev) => [...prev.slice(0, -1), errorMessage]);
     } finally {
       setIsLoading(false);
+      // Permitir sincronización de nuevo
+      isSendingMessage.current = false;
     }
   };
 
