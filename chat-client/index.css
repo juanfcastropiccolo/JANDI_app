@@ -194,3 +194,48 @@ aside ::-webkit-scrollbar-thumb {
 aside ::-webkit-scrollbar-thumb:hover {
   background: rgba(55, 183, 195, 0.7);
 }
+
+/* Cart Button Styles */
+.cart-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 40;
+}
+
+/* Cart Drawer Responsive */
+@media (max-width: 768px) {
+  .cart-drawer {
+    width: 100vw !important;
+  }
+  
+  .cart-button {
+    top: 16px;
+    right: 16px;
+    width: 48px !important;
+    height: 48px !important;
+  }
+  
+  .cart-item img {
+    width: 50px !important;
+    height: 50px !important;
+  }
+}
+
+/* Cart Item List Scrollbar */
+.cart-item-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cart-item-list::-webkit-scrollbar-track {
+  background: rgba(55, 183, 195, 0.1);
+}
+
+.cart-item-list::-webkit-scrollbar-thumb {
+  background: rgba(55, 183, 195, 0.4);
+  border-radius: 3px;
+}
+
+.cart-item-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(55, 183, 195, 0.6);
+}

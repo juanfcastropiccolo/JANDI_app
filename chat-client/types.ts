@@ -108,3 +108,17 @@ export interface Checkout {
   order_permalink_url?: string;
   payment?: Payment;
 }
+
+// Cart Types
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  addedAt: Date;
+}
+
+export interface CartState {
+  items: CartItem[];
+  isOpen: boolean;
+  isConfirmed: boolean;
+  total: number;
+}

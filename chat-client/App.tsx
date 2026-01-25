@@ -23,8 +23,10 @@ import { ChatHome } from './components/ChatHome';
 import {appConfig} from './config';
 import {CredentialProviderProxy} from './mocks/credentialProviderProxy';
 import { ConversationProvider, useConversations } from './contexts/ConversationContext';
+import { CartProvider, useCart } from './contexts/CartContext';
 import { useSidebar } from './hooks/useSidebar';
 import { useWindowSize } from './hooks/useWindowSize';
+import { CartButton, CartDrawer } from './components/Cart';
 
 import {type ChatMessage, type PaymentInstrument, type Product, Sender, type Checkout, type PaymentHandler} from './types';
 
@@ -61,6 +63,22 @@ function AppContent() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { isOpen, toggle, close } = useSidebar();
   const { isMobile, isDesktop } = useWindowSize();
+
+  // Hook del carrito
+  const {
+    items: cartItems,
+    isOpen: isCartOpen,
+    isConfirmed,
+    total: cartTotal,
+    addItem,
+    removeItem,
+    updateQuantity,
+    toggleCart,
+    closeCart,
+    toggleConfirmation,
+    clearCart,
+    getItemCount,
+  } = useCart();
 
   // Usar el context de conversaciones
   const {
@@ -158,6 +176,10 @@ function AppContent() {
   }, [messages]);
 
   const handleAddToCheckout = (productToAdd: Product) => {
+    // Agregar al carrito local
+    addItem(productToAdd, 1);
+    
+    // También enviar al agente (lógica existente)
     const actionPayload = JSON.stringify({
       action: 'add_to_checkout',
       product_id: productToAdd.productID,
@@ -458,6 +480,24 @@ function AppContent() {
 
   const lastCheckoutIndex = messages.map((m) => !!m.checkout).lastIndexOf(true);
 
+  // Handler para pago desde el carrito
+  const handlePayFromCart = async () => {
+    if (!isConfirmed || cartItems.length === 0) return;
+    
+    closeCart(); // Cerrar el drawer
+    
+    // Enviar acción de inicio de pago al agente
+    const actionPayload = JSON.stringify({
+      action: 'start_payment',
+      cart_items: cartItems.map(item => ({
+        product_id: item.product.productID,
+        quantity: item.quantity,
+      })),
+    });
+    
+    await handleSendMessage(actionPayload, {isUserAction: true});
+  };
+
   // Renderizar según superficie activa
   if (uiSurface === 'voiceHome') {
     return (
@@ -536,6 +576,25 @@ function AppContent() {
           </>
         )}
       </div>
+
+      {/* Cart Components - Siempre renderizados */}
+      <CartButton
+        itemCount={getItemCount()}
+        onClick={toggleCart}
+        isOpen={isCartOpen}
+      />
+      
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={closeCart}
+        items={cartItems}
+        total={cartTotal}
+        isConfirmed={isConfirmed}
+        onToggleConfirmation={toggleConfirmation}
+        onPay={handlePayFromCart}
+        onRemoveItem={removeItem}
+        onUpdateQuantity={updateQuantity}
+      />
     </div>
   );
 }
@@ -547,7 +606,9 @@ function AppContent() {
 function App() {
   return (
     <ConversationProvider>
-      <AppContent />
+      <CartProvider>
+        <AppContent />
+      </CartProvider>
     </ConversationProvider>
   );
 }
