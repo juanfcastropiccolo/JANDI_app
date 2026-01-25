@@ -1,21 +1,27 @@
-# Python
+# Python - no deployar el backend en Vercel
 business_agent/
 **/__pycache__/
 **/*.pyc
 **/.venv/
 **/.python-version
 
-# Documentation
+# Documentation - no necesaria en producción
 documentation/
 *.md
 !README.md
+!chat-client/**/*.md
 
-# Assets
+# Assets - no necesarios en producción (el frontend tiene sus propios assets)
 assets/
 
-# SQL
+# SQL - no necesario en producción
+sql_scripts/
 *.sql
 
 # Local env files (usar las variables de Vercel en su lugar)
 .env.local
 .env*.local
+!chat-client/.env.production
+
+# Node modules - Vercel lo instala automáticamente
+**/node_modules/
