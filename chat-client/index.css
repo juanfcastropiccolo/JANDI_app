@@ -1,0 +1,196 @@
+/*
+ * Copyright 2026 UCP Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* JANDI Color Palette - Nueva Paleta */
+:root {
+  --jandi-dark-blue: #071952;    /* Azul oscuro principal - Sidebar background */
+  --jandi-medium-blue: #088395;  /* Azul medio - Hover states, elementos secundarios */
+  --jandi-light-blue: #37B7C3;   /* Azul claro/turquesa - Acentos, botones, activos */
+  --jandi-background: #EBF4F6;   /* Fondo del chat principal */
+  --jandi-white: #FFFFFF;
+  --jandi-gray-light: #F9FAFB;
+  --jandi-gray: #9CA3AF;
+  
+  /* Aliases para compatibilidad */
+  --jandi-purple: #071952;
+  --jandi-blue: #088395;
+  --jandi-teal: #37B7C3;
+  --jandi-cream: #EBF4F6;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .dark\:bg-gray-800 {
+    background-color: rgb(31 41 55);
+  }
+  
+  .dark\:bg-gray-900 {
+    background-color: rgb(17 24 39);
+  }
+  
+  .dark\:text-gray-100 {
+    color: rgb(243 244 246);
+  }
+  
+  .dark\:text-gray-300 {
+    color: rgb(209 213 219);
+  }
+  
+  .dark\:border-gray-600 {
+    border-color: rgb(75 85 99);
+  }
+  
+  .dark\:border-gray-700 {
+    border-color: rgb(55 65 81);
+  }
+}
+
+/* Smooth transitions */
+button, a, input {
+  transition-property: background-color, border-color, color, transform, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Canvas optimization */
+canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Animation utilities */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-25%);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 300ms ease-out;
+}
+
+/* Slide in from left */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-left {
+  animation: slideInLeft 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Welcome message animation */
+.welcome-message {
+  animation: fadeInUp 600ms ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(8, 131, 149, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(8, 131, 149, 0.7);
+}
+
+/* Scrollbar para el sidebar */
+aside ::-webkit-scrollbar-track {
+  background: rgba(8, 131, 149, 0.2);
+}
+
+aside ::-webkit-scrollbar-thumb {
+  background: rgba(55, 183, 195, 0.5);
+}
+
+aside ::-webkit-scrollbar-thumb:hover {
+  background: rgba(55, 183, 195, 0.7);
+}

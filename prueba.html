@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cloud Audio Visualizer (Canvas + WebAudio)</title>
+  <style>
+    html, body { margin:0; height:100%; background:#05070a; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #ui {
+      position: fixed; inset: 16px 16px auto 16px;
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+      background: rgba(10,14,18,0.65); border: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 12px; border-radius: 14px; backdrop-filter: blur(10px);
+      color: rgba(255,255,255,0.9);
+      max-width: 980px;
+    }
+    button, input[type="file"] {
+      border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9);
+      padding: 10px 12px; cursor:pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.10); }
+    .pill { padding: 8px 10px; border-radius: 999px; border:1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); }
+    label { display:flex; gap:8px; align-items:center; }
+    input[type="range"] { width: 180px; }
+    #hint { opacity:0.8; font-size: 12px; }
+    canvas { display:block; width:100%; height:100%; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button id="btnMic">🎙️ Usar micrófono</button>
+    <label class="pill">🎵 Cargar audio
+      <input id="file" type="file" accept="audio/*" />
+    </label>
+    <button id="btnTone">🔊 Tono demo</button>
+    <button id="btnStop">⏹️ Stop</button>
+
+    <label class="pill">Sensibilidad
+      <input id="sens" type="range" min="0.6" max="3.0" step="0.05" value="1.6">
+      <span id="sensVal">1.60</span>
+    </label>
+
+    <label class="pill">Tamaño nube
+      <input id="size" type="range" min="0.7" max="2.2" step="0.05" value="1.2">
+      <span id="sizeVal">1.20</span>
+    </label>
+
+    <div id="hint" class="pill">Tip: si querés engancharlo a voz TTS del LLM, reproducí el audio en un &lt;audio&gt; y conectalo al analyser (abajo te digo cómo).</div>
+  </div>
+
+  <audio id="player" controls style="position:fixed; left:16px; bottom:16px; width:min(520px, calc(100% - 32px)); opacity:0.9;"></audio>
+  <canvas id="c"></canvas>
+
+<script>
+(() => {
+  // ---------- Canvas ----------
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = Math.floor(window.innerWidth * DPR);
+    H = Math.floor(window.innerHeight * DPR);
+    canvas.width = W;
+    canvas.height = H;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- UI ----------
+  const btnMic = document.getElementById('btnMic');
+  const btnTone = document.getElementById('btnTone');
+  const btnStop = document.getElementById('btnStop');
+  const file = document.getElementById('file');
+  const player = document.getElementById('player');
+  const sens = document.getElementById('sens');
+  const sensVal = document.getElementById('sensVal');
+  const size = document.getElementById('size');
+  const sizeVal = document.getElementById('sizeVal');
+
+  sens.addEventListener('input', () => sensVal.textContent = (+sens.value).toFixed(2));
+  size.addEventListener('input', () => sizeVal.textContent = (+size.value).toFixed(2));
+
+  // ---------- WebAudio ----------
+  let audioCtx = null;
+  let analyser = null;
+  let sourceNode = null;
+  let micStream = null;
+  let toneOsc = null;
+  let toneGain = null;
+
+  const fftSize = 1024;
+
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!analyser) {
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = fftSize;
+      analyser.smoothingTimeConstant = 0.85;
+    }
+  }
+
+  function cleanupSources() {
+    try { if (sourceNode) sourceNode.disconnect(); } catch {}
+    sourceNode = null;
+
+    try { if (toneOsc) toneOsc.stop(); } catch {}
+    try { if (toneOsc) toneOsc.disconnect(); } catch {}
+    try { if (toneGain) toneGain.disconnect(); } catch {}
+    toneOsc = null; toneGain = null;
+
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+  }
+
+  function connectToDestination() {
+    // Ojo: si querés solo visual y no audio, podés NO conectar al destination.
+    // Para demo dejamos sonido activo.
+    try { analyser.disconnect(); } catch {}
+    analyser.connect(audioCtx.destination);
+  }
+
+  async function useMic() {
+    ensureAudio();
+    cleanupSources();
+    await audioCtx.resume();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    sourceNode = audioCtx.createMediaStreamSource(micStream);
+    sourceNode.connect(analyser);
+    connectToDestination(); // (para mic, esto puede generar feedback si tenés parlantes. Si pasa, comentá esta línea)
+  }
+
+  function useTone() {
+    ensureAudio();
+    cleanupSources();
+    audioCtx.resume();
+    toneOsc = audioCtx.createOscillator();
+    toneGain = audioCtx.createGain();
+    toneOsc.type = 'sine';
+    toneOsc.frequency.value = 160;
+    toneGain.gain.value = 0.08;
+
+    toneOsc.connect(toneGain);
+    toneGain.connect(analyser);
+    connectToDestination();
+    toneOsc.start();
+  }
+
+  function useAudioElement(audioEl) {
+    ensureAudio();
+    cleanupSources();
+    audioCtx.resume();
+
+    // Important: solo podés crear un MediaElementSource por audio element.
+    sourceNode = audioCtx.createMediaElementSource(audioEl);
+    sourceNode.connect(analyser);
+    connectToDestination();
+  }
+
+  btnMic.addEventListener('click', () => useMic().catch(err => alert('Mic error: ' + err.message)));
+  btnTone.addEventListener('click', () => useTone());
+  btnStop.addEventListener('click', () => {
+    cleanupSources();
+    if (player) { player.pause(); player.src = ""; }
+  });
+
+  file.addEventListener('change', () => {
+    const f = file.files?.[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    player.src = url;
+    player.play().catch(() => {});
+    useAudioElement(player);
+  });
+
+  // Si apretás play en el player (sin cargar por input), intentamos conectar igual:
+  player.addEventListener('play', () => {
+    try { useAudioElement(player); } catch {}
+  });
+
+  // ---------- Cloud Particles ----------
+  const N = 1200;
+  const points = new Array(N);
+  const center = () => ({ x: W*0.5, y: H*0.5 });
+
+  // Distribución inicial: esfera “puffy”
+  function randn() {
+    // Box-Muller
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  for (let i = 0; i < N; i++) {
+    const r = Math.abs(randn()) * 0.55 + Math.random() * 0.15;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2*Math.random() - 1);
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+
+    points[i] = {
+      x, y, z,
+      vx: (Math.random()-0.5)*0.002,
+      vy: (Math.random()-0.5)*0.002,
+      vz: (Math.random()-0.5)*0.002,
+      seed: Math.random()*1000
+    };
+  }
+
+  const freq = new Uint8Array(fftSize / 2);
+  const time = new Uint8Array(fftSize);
+
+  function getAudioFeatures() {
+    if (!analyser) return { rms: 0, bass: 0, mid: 0, treble: 0, energy: 0 };
+    analyser.getByteFrequencyData(freq);
+    analyser.getByteTimeDomainData(time);
+
+    // RMS (volumen)
+    let sum = 0;
+    for (let i = 0; i < time.length; i++) {
+      const v = (time[i] - 128) / 128;
+      sum += v*v;
+    }
+    const rms = Math.sqrt(sum / time.length);
+
+    // bandas simples (bass/mid/treble)
+    const band = (from, to) => {
+      let s=0, c=0;
+      for (let i = from; i < to; i++) { s += freq[i]; c++; }
+      return c ? (s/c)/255 : 0;
+    };
+    const bass = band(0, 18);     // aprox
+    const mid = band(18, 90);
+    const treble = band(90, 220);
+
+    const energy = Math.min(1, (rms*1.8 + bass*0.9 + mid*0.5) / 2.2);
+    return { rms, bass, mid, treble, energy };
+  }
+
+  let t = 0;
+
+  function draw() {
+    requestAnimationFrame(draw);
+    t += 0.010;
+
+    // Fondo con leve “trail”
+    ctx.fillStyle = 'rgb(5,7,10)';
+    ctx.fillRect(0, 0, W, H);
+
+    const { rms, bass, mid, treble, energy } = getAudioFeatures();
+    const sensitivity = +sens.value;
+    const cloudSize = +size.value;
+
+    const c = center();
+    const baseRadius = Math.min(W, H) * 0.18 * cloudSize;
+    const pulse = 1 + energy * 0.65 * sensitivity;
+
+    // “Viento” (turbulencia) guiado por audio
+    const swirl = (0.45 + mid*0.9) * 0.004 * sensitivity;
+    const jitter = (0.20 + treble*1.2) * 0.006 * sensitivity;
+    const drift = (0.25 + bass*1.1) * 0.004 * sensitivity;
+
+    // Rotación lenta para efecto 3D
+    const rotY = 0.20 + energy*0.65;
+    const rotX = 0.12 + energy*0.35;
+    const cy = Math.cos(t*rotY), sy = Math.sin(t*rotY);
+    const cx = Math.cos(t*rotX), sx = Math.sin(t*rotX);
+
+    // brillo / “glow”
+    const alphaBase = 0.10 + energy * 0.22;
+
+    // Orden por z (pintar atrás->adelante)
+    const projected = [];
+
+    for (let i = 0; i < N; i++) {
+      const p = points[i];
+
+      // dinámica: un ruido suave + empuje por energía
+      const n1 = Math.sin(t*1.6 + p.seed) * jitter;
+      const n2 = Math.cos(t*1.2 + p.seed*0.7) * jitter;
+
+      p.vx += n1 + (Math.random()-0.5)*0.0002;
+      p.vy += n2 + (Math.random()-0.5)*0.0002;
+      p.vz += (Math.sin(t + p.seed)*0.0008);
+
+      // “respiración” de nube
+      const breathe = 1 + Math.sin(t*0.9 + p.seed)*0.03;
+      const audioPush = (energy*energy) * 0.015 * sensitivity;
+
+      // movimiento de partículas alrededor del centro
+      p.x += p.vx + (p.x * audioPush) + (Math.sin(t + p.seed)*drift*0.2);
+      p.y += p.vy + (p.y * audioPush) + (Math.cos(t + p.seed)*drift*0.2);
+      p.z += p.vz + (p.z * audioPush*0.7);
+
+      // amortiguación
+      p.vx *= 0.92;
+      p.vy *= 0.92;
+      p.vz *= 0.92;
+
+      // limitador: mantenemos en una “bola”
+      const rr = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z) || 1;
+      const maxR = 1.05 * breathe * pulse;
+      if (rr > maxR) {
+        p.x *= maxR / rr;
+        p.y *= maxR / rr;
+        p.z *= maxR / rr;
+      }
+
+      // Rotación 3D
+      let x = p.x, y = p.y, z = p.z;
+
+      // rotate Y
+      let x1 = x * cy - z * sy;
+      let z1 = x * sy + z * cy;
+      x = x1; z = z1;
+
+      // rotate X
+      let y1 = y * cx - z * sx;
+      let z2 = y * sx + z * cx;
+      y = y1; z = z2;
+
+      // perspectiva
+      const depth = 2.4;
+      const k = 1 / (depth - z);
+      const px = c.x + x * baseRadius * k;
+      const py = c.y + y * baseRadius * k;
+
+      const sizePx = (0.9 + k*1.8) * (1.1 + bass*1.6) * (0.8 + rms*2.2) * 1.15;
+      const a = Math.min(0.85, alphaBase + k*0.15 + rms*0.35);
+
+      projected.push({ px, py, z, r: sizePx, a });
+    }
+
+    projected.sort((a,b) => a.z - b.z);
+
+    // Pintado: círculos suaves (nube)
+    for (const q of projected) {
+      const r = q.r;
+      const g = ctx.createRadialGradient(q.px, q.py, 0, q.px, q.py, r*6);
+      // “blanco/azulado” tipo energía (podés cambiarlo)
+      g.addColorStop(0, `rgba(220,245,255,${q.a})`);
+      g.addColorStop(0.25, `rgba(120,210,255,${q.a*0.55})`);
+      g.addColorStop(1, `rgba(10,20,30,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(q.px, q.py, r*6, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // halo central
+    const halo = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, baseRadius*0.9);
+    halo.addColorStop(0, `rgba(140,220,255,${0.10 + energy*0.25})`);
+    halo.addColorStop(1, `rgba(0,0,0,0)`);
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, baseRadius*0.9, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  draw();
+
+  // Auto: tono demo si querés ver algo sin tocar nada
+  // useTone();
+
+})();
+</script>
+</body>
+</html>
