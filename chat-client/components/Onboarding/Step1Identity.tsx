@@ -48,6 +48,16 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
       !!formData.primaryAddress?.state &&
       !!formData.primaryAddress?.zip;
 
+    console.log('[Step1Identity] Validation:', {
+      nickname: !!formData.nickname,
+      phone: !!formData.phone,
+      street: !!formData.primaryAddress?.street,
+      city: !!formData.primaryAddress?.city,
+      state: !!formData.primaryAddress?.state,
+      zip: !!formData.primaryAddress?.zip,
+      isValid
+    });
+
     onValidationChange(isValid);
   }, [formData, onValidationChange]);
 
@@ -123,35 +133,40 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
           Dirección principal *
         </label>
         <div className="space-y-3">
+          {/* Calle */}
           <input
             type="text"
-            value={formData.primaryAddress?.street}
+            value={formData.primaryAddress?.street || ''}
             onChange={(e) => handleAddressChange('street', e.target.value)}
             placeholder="Calle y número"
             className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              value={formData.primaryAddress?.city}
-              onChange={(e) => handleAddressChange('city', e.target.value)}
-              placeholder="Ciudad"
-              className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
-              style={{ borderColor: 'var(--jandi-gray-light)' }}
-            />
-            <input
-              type="text"
-              value={formData.primaryAddress?.state}
-              onChange={(e) => handleAddressChange('state', e.target.value)}
-              placeholder="Provincia"
-              className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
-              style={{ borderColor: 'var(--jandi-gray-light)' }}
-            />
-          </div>
+          
+          {/* Ciudad */}
           <input
             type="text"
-            value={formData.primaryAddress?.zip}
+            value={formData.primaryAddress?.city || ''}
+            onChange={(e) => handleAddressChange('city', e.target.value)}
+            placeholder="Ciudad"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            style={{ borderColor: 'var(--jandi-gray-light)' }}
+          />
+          
+          {/* Provincia */}
+          <input
+            type="text"
+            value={formData.primaryAddress?.state || ''}
+            onChange={(e) => handleAddressChange('state', e.target.value)}
+            placeholder="Provincia"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            style={{ borderColor: 'var(--jandi-gray-light)' }}
+          />
+          
+          {/* Código postal */}
+          <input
+            type="text"
+            value={formData.primaryAddress?.zip || ''}
             onChange={(e) => handleAddressChange('zip', e.target.value)}
             placeholder="Código postal"
             className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"

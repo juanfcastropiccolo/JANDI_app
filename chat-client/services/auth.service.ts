@@ -140,21 +140,21 @@ export class AuthService {
 
       console.log('[authService] getCurrentUser: Auth user OK:', user.id);
 
-      // 2. Query simple con timeout agresivo
+      // 2. Query con timeout y sin .single() para evitar error 406
       const queryStartTime = Date.now();
       
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Query timeout (2s)'));
-        }, 2000); // Solo 2 segundos
+          reject(new Error('Query timeout (3s)'));
+        }, 3000);
       });
       
+      // Usar .maybeSingle() en lugar de .single() para no lanzar error si no hay filas
       const queryPromise = supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .limit(1)
-        .single();
+        .maybeSingle();
       
       const result = await Promise.race([queryPromise, timeoutPromise]);
 
@@ -166,8 +166,9 @@ export class AuthService {
       if (error) {
         console.error('[authService] getCurrentUser: Query error:', error.code, error.message);
         
-        if (error.code === 'PGRST116') {
-          console.warn('[authService] getCurrentUser: User not in DB yet');
+        // Si es error de RLS o permisos, devolver null (no lanzar error)
+        if (error.code === '42501' || error.message.includes('permission denied')) {
+          console.warn('[authService] getCurrentUser: RLS permission denied, user may not exist yet');
           return null;
         }
         
@@ -175,13 +176,19 @@ export class AuthService {
       }
 
       if (!data) {
-        console.warn('[authService] getCurrentUser: No data returned');
+        console.warn('[authService] getCurrentUser: User not in DB yet');
         return null;
       }
 
       console.log('[authService] getCurrentUser: ✅ SUCCESS:', data.email);
       return data as User;
     } catch (err) {
+      // Si es timeout, devolver null en lugar de lanzar error
+      if (err instanceof Error && err.message.includes('Query timeout')) {
+        console.warn('[authService] getCurrentUser: ⚠️ Query timeout, user may still be creating');
+        return null;
+      }
+      
       console.error('[authService] getCurrentUser: ❌ ERROR:', err);
       throw err;
     }
