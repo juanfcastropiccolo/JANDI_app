@@ -19,6 +19,15 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import { LoadingSpinner } from '../Shared/LoadingSpinner';
 
+/**
+ * AuthCallbackSimple - Componente simplificado para OAuth callback
+ * 
+ * Con detectSessionInUrl: true, Supabase maneja automáticamente el intercambio
+ * de código por sesión. Este componente solo:
+ * 1. Verifica que la sesión exista
+ * 2. Crea el perfil del usuario en la DB si no existe (sin RLS habilitado temporalmente)
+ * 3. Redirige al usuario según su estado de onboarding
+ */
 export function AuthCallbackSimple() {
   const navigate = useNavigate();
   const [message, setMessage] = useState('Procesando autenticación...');
@@ -26,67 +35,29 @@ export function AuthCallbackSimple() {
 
   useEffect(() => {
     let alive = true;
-    const processedRef = { current: false };
 
     const handleCallback = async () => {
-      if (processedRef.current) {
-        console.log('[AuthCallbackSimple] Already processed, skipping...');
-        return;
-      }
-      processedRef.current = true;
-
       try {
         console.log('[AuthCallbackSimple] ===== INICIO DEL CALLBACK =====');
         
         // 1. Verificar si hay error en la URL
         const url = new URL(window.location.href);
         const errorParam = url.searchParams.get('error');
-        const errorDescription = url.searchParams.get('error_description');
         
         if (errorParam) {
+          const errorDescription = url.searchParams.get('error_description');
           const msg = decodeURIComponent(errorDescription || errorParam);
-          console.error('[AuthCallbackSimple] Error en callback:', msg);
+          console.error('[AuthCallbackSimple] Error OAuth:', msg);
           throw new Error(msg);
         }
-
-        // 2. Obtener el código de auth
-        const code = url.searchParams.get('code');
-        console.log('[AuthCallbackSimple] Código encontrado:', code ? 'SÍ' : 'NO');
-
-        if (!code) {
-          console.warn('[AuthCallbackSimple] No hay código, redirigiendo a login');
-          navigate('/login', { replace: true });
-          return;
-        }
-
-        if (!alive) return;
-        setMessage('Intercambiando código de autenticación...');
-
-        // 3. Intercambiar código por sesión
-        console.log('[AuthCallbackSimple] Intercambiando código...');
-        const { data: sessionData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (exchangeError) {
-          console.error('[AuthCallbackSimple] Error exchangeCodeForSession:', exchangeError);
-          
-          // Si el código ya fue usado, verificar si hay sesión
-          const { data: { session: existingSession } } = await supabase.auth.getSession();
-          if (existingSession) {
-            console.log('[AuthCallbackSimple] Sesión existe a pesar del error, continuando...');
-          } else {
-            throw exchangeError;
-          }
-        } else {
-          console.log('[AuthCallbackSimple] ✅ Código intercambiado exitosamente');
-        }
-
-        // Limpiar URL
-        window.history.replaceState({}, document.title, '/auth/callback');
 
         if (!alive) return;
         setMessage('Verificando sesión...');
 
-        // 4. Verificar que tenemos sesión
+        // 2. Esperar un momento para que Supabase termine de procesar la sesión
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 3. Verificar que tenemos sesión (Supabase ya hizo el exchangeCodeForSession)
         console.log('[AuthCallbackSimple] Verificando sesión...');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
@@ -96,164 +67,37 @@ export function AuthCallbackSimple() {
         }
 
         if (!session || !session.user) {
-          console.error('[AuthCallbackSimple] No hay sesión después del intercambio');
-          throw new Error('No se pudo establecer la sesión');
+          console.log('[AuthCallbackSimple] No hay sesión todavía, esperando...');
+          // Esperar un poco más y reintentar
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (!retrySession || !retrySession.user) {
+            console.error('[AuthCallbackSimple] No se pudo establecer la sesión');
+            throw new Error('No se pudo establecer la sesión. Intentá nuevamente.');
+          }
+          
+          console.log('[AuthCallbackSimple] ✅ Sesión verificada (retry):', retrySession.user.email);
+          return handleUserProfile(retrySession.user, alive, setMessage, navigate);
         }
 
         console.log('[AuthCallbackSimple] ✅ Sesión verificada:', session.user.email);
 
-        if (!alive) return;
-        setMessage('Configurando tu perfil...');
-
-        // 5. Crear/actualizar registro en tabla users
-        console.log('[AuthCallbackSimple] Creando/actualizando usuario en DB...');
-        const userId = session.user.id;
-        const email = session.user.email || '';
-        const fullName = 
-          (session.user.user_metadata?.full_name as string) || 
-          (session.user.user_metadata?.name as string) || 
-          '';
-        const avatarUrl = 
-          (session.user.user_metadata?.avatar_url as string) || 
-          (session.user.user_metadata?.picture as string) || 
-          null;
-        const googleId = session.user.identities?.find(i => i.provider === 'google')?.id || null;
-
-        console.log('[AuthCallbackSimple] Datos del usuario:', {
-          userId,
-          email,
-          fullName,
-          googleId: googleId ? 'presente' : 'ausente',
-        });
-
-        // Primero verificar si el usuario ya existe
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id, onboarding_completed')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          console.error('[AuthCallbackSimple] ❌ Error verificando usuario existente:', checkError);
-          
-          if (checkError.code === '42501' || checkError.message.includes('permission denied')) {
-            throw new Error('ERROR RLS: No podés leer la tabla users. Ejecutá TEST_RLS.sql en Supabase.');
-          }
-          
-          throw checkError;
-        }
-
-        console.log('[AuthCallbackSimple] Usuario existente:', existingUser ? 'SÍ' : 'NO');
-
-        let upsertError;
-        if (existingUser) {
-          // Usuario existe, actualizar
-          const { error } = await supabase
-            .from('users')
-            .update({
-              last_login_at: new Date().toISOString(),
-              full_name: fullName || existingUser.full_name,
-              avatar_url: avatarUrl || existingUser.avatar_url,
-            })
-            .eq('id', userId);
-          upsertError = error;
-        } else {
-          // Usuario no existe, crear
-          const { error } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              email,
-              full_name: fullName,
-              avatar_url: avatarUrl,
-              google_id: googleId,
-              auth_provider: 'google',
-              onboarding_completed: false,
-              is_active: true,
-              last_login_at: new Date().toISOString(),
-              metadata: session.user.user_metadata || {},
-            });
-          upsertError = error;
-        }
-
-        if (upsertError) {
-          console.error('[AuthCallbackSimple] ❌ Error guardando usuario:', upsertError);
-          console.error('[AuthCallbackSimple] Error code:', upsertError.code);
-          console.error('[AuthCallbackSimple] Error message:', upsertError.message);
-          
-          // Si es un error de permisos RLS, informar claramente
-          if (upsertError.code === '42501' || upsertError.message.includes('permission denied')) {
-            throw new Error('ERROR RLS: Las políticas de seguridad no están configuradas. Ejecutá TEST_RLS.sql en Supabase para diagnosticar.');
-          }
-          
-          throw upsertError;
-        }
-
-        console.log('[AuthCallbackSimple] ✅ Usuario guardado en DB');
-
-        if (!alive) return;
-        
-        // 6. Determinar destino según si el usuario ya existe o no
-        const destination = existingUser ? '/chat' : '/onboarding';
-        console.log('[AuthCallbackSimple] Usuario existente:', existingUser ? 'SÍ' : 'NO');
-        console.log('[AuthCallbackSimple] Destino:', destination);
-        
-        // 7. Forzar un refresh del auth state para que useAuth lo detecte
-        console.log('[AuthCallbackSimple] Forzando refresh de auth state...');
-        await supabase.auth.refreshSession();
-        
-        // 8. Pequeña espera para que el auth state se propague
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        if (!alive) return;
-        
-        console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-        console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
-        
-        // 9. Redirigir inmediatamente - AuthGuard y OnboardingGuard manejarán el resto
-        if (alive) {
-          navigate(destination, { replace: true });
-        }
+        // 4. Procesar perfil del usuario
+        await handleUserProfile(session.user, alive, setMessage, navigate);
 
       } catch (err) {
-        console.error('[AuthCallbackSimple] ===== ERROR EN CALLBACK =====');
-        console.error('[AuthCallbackSimple] Error:', err);
+        console.error('[AuthCallbackSimple] ===== ERROR EN CALLBACK =====', err);
         
-        if (err instanceof Error) {
-          console.error('[AuthCallbackSimple] Error name:', err.name);
-          console.error('[AuthCallbackSimple] Error message:', err.message);
-          console.error('[AuthCallbackSimple] Error stack:', err.stack);
-        }
-
-        // Ignorar AbortError - NO reintentar automáticamente para evitar loops
-        if (err instanceof Error && err.name === 'AbortError') {
-          console.warn('[AuthCallbackSimple] ⚠️ AbortError detectado - posible problema de RLS o timing');
-          console.warn('[AuthCallbackSimple] Verificá que las políticas RLS estén aplicadas en Supabase');
-          
-          if (!alive) return;
-          
-          setError('Error de sincronización. Ejecutá TEST_RLS.sql en Supabase para verificar RLS.');
-          setMessage('Error: Problema con políticas de seguridad');
-          
-          setTimeout(() => {
-            if (alive) navigate('/login', { replace: true });
-          }, 5000);
-          return;
-        }
-
         if (!alive) return;
 
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        const errorMessage = err instanceof Error ? err.message : 'Error al procesar autenticación';
         setError(errorMessage);
-        setMessage('Error al procesar autenticación');
+        setMessage('Error al iniciar sesión');
 
-        // Redirigir a login después de 5s
         setTimeout(() => {
-          if (alive) {
-            console.log('[AuthCallbackSimple] Redirigiendo a login después de error');
-            navigate('/login', { replace: true });
-          }
-        }, 5000);
+          if (alive) navigate('/login', { replace: true });
+        }, 3000);
       }
     };
 
@@ -276,11 +120,46 @@ export function AuthCallbackSimple() {
             <div className="font-bold mb-2">Error:</div>
             <div>{error}</div>
             <div className="mt-3 text-xs opacity-75">
-              Serás redirigido al login en 5 segundos...
+              Serás redirigido al login en 3 segundos...
             </div>
           </div>
         )}
       </div>
     </div>
   );
+}
+
+/**
+ * Función auxiliar para redirigir al usuario
+ * 
+ * NO hacemos queries a la DB aquí porque:
+ * 1. El usuario ya se crea automáticamente en la tabla users
+ * 2. Las queries con RLS pueden tardar mucho (race condition)
+ * 3. El AuthGuard y OnboardingGuard manejarán la lógica de redirección correcta
+ */
+async function handleUserProfile(
+  user: any, 
+  alive: boolean, 
+  setMessage: (msg: string) => void, 
+  navigate: (path: string, options?: any) => void
+) {
+  try {
+    if (!alive) return;
+    setMessage('¡Listo! Redirigiendo...');
+
+    console.log('[AuthCallbackSimple] Usuario autenticado:', user.email);
+    
+    // Redirigir a onboarding - El OnboardingGuard se encargará de verificar
+    // si el usuario ya completó el onboarding y lo mandará a /chat si corresponde
+    console.log('[AuthCallbackSimple] Redirigiendo a: /onboarding');
+    console.log('[AuthCallbackSimple] (El OnboardingGuard verificará si ya completó onboarding)');
+    console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
+    
+    if (alive) {
+      navigate('/onboarding', { replace: true });
+    }
+  } catch (err) {
+    console.error('[AuthCallbackSimple] Error en handleUserProfile:', err);
+    throw err;
+  }
 }
