@@ -31,11 +31,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // Dar tiempo extra para que la autenticación se complete
     // Esto es importante después del callback de OAuth
     const timer = setTimeout(() => {
+      console.log('[AuthGuard] Timer finished, user:', user ? user.email : 'null');
       setWaitingForAuth(false);
-    }, 3000); // Esperar hasta 3 segundos antes de redirigir a login
+    }, 5000); // Esperar hasta 5 segundos antes de redirigir a login
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
 
   // Mostrar loading mientras carga o mientras esperamos
   if (loading || (waitingForAuth && !user)) {

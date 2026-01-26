@@ -191,6 +191,15 @@ export function AuthCallbackSimple() {
 
         console.log('[AuthCallbackSimple] ✅ Usuario guardado en DB');
 
+        // Refrescar la sesión para asegurar que RLS tenga los permisos actualizados
+        console.log('[AuthCallbackSimple] Refrescando sesión...');
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.warn('[AuthCallbackSimple] ⚠️ Error refrescando sesión:', refreshError);
+        } else {
+          console.log('[AuthCallbackSimple] ✅ Sesión refrescada');
+        }
+
         if (!alive) return;
         setMessage('Cargando tu perfil...');
 
@@ -198,7 +207,7 @@ export function AuthCallbackSimple() {
         console.log('[AuthCallbackSimple] Leyendo usuario de DB...');
         
         // Esperar un poco para que la DB se sincronice
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 800));
         
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -228,9 +237,10 @@ export function AuthCallbackSimple() {
         if (!alive) return;
         setMessage('¡Listo! Preparando tu experiencia...');
 
-        // 7. Esperar a que useAuth detecte la sesión
+        // 7. Esperar a que useAuth detecte la sesión y cargue el usuario
         console.log('[AuthCallbackSimple] Esperando a que useAuth sincronice...');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Aumentar el tiempo de espera para asegurar que useAuth tenga chance de cargar
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         if (!alive) return;
         

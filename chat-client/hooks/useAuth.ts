@@ -51,41 +51,62 @@ export function useAuth() {
         try {
           if (session?.user) {
             console.log('[useAuth] Session found, loading user...');
-            // Esperar un poquito para que Supabase termine de procesar
-            await new Promise(resolve => setTimeout(resolve, 100));
             
-            if (!alive) return;
+            // Reintentar hasta 3 veces si no encuentra el usuario
+            let currentUser = null;
+            let attempts = 0;
+            const maxAttempts = 3;
             
-            console.log('[useAuth] Calling authService.getCurrentUser()...');
-            
-            try {
-              const currentUser = await withTimeout(
-                authService.getCurrentUser(),
-                10000,
-                'Timeout al cargar usuario'
-              );
+            while (!currentUser && attempts < maxAttempts && alive) {
+              attempts++;
+              console.log(`[useAuth] Intento ${attempts}/${maxAttempts} de cargar usuario...`);
+              
+              // Esperar un poco antes de cada intento (excepto el primero)
+              if (attempts > 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              } else {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
               
               if (!alive) return;
               
-              if (currentUser) {
-                console.log('[useAuth] ✅ User loaded successfully:', currentUser.email);
-                setUser(currentUser);
-                setError(null);
-              } else {
-                console.warn('[useAuth] ⚠️ getCurrentUser returned null');
-                // No setear error, solo no hay usuario todavía
-                // Esto puede pasar durante el callback mientras se crea el registro
-                setUser(null);
+              try {
+                currentUser = await withTimeout(
+                  authService.getCurrentUser(),
+                  10000,
+                  'Timeout al cargar usuario'
+                );
+                
+                if (!alive) return;
+                
+                if (currentUser) {
+                  console.log(`[useAuth] ✅ User loaded successfully in attempt ${attempts}:`, currentUser.email);
+                  setUser(currentUser);
+                  setError(null);
+                  break;
+                } else {
+                  console.warn(`[useAuth] ⚠️ Attempt ${attempts}: getCurrentUser returned null`);
+                  if (attempts < maxAttempts) {
+                    console.log('[useAuth] User not found yet, will retry...');
+                  }
+                }
+              } catch (err) {
+                console.error(`[useAuth] Error loading user in attempt ${attempts}:`, err);
+                // Si es el último intento, manejar el error
+                if (attempts >= maxAttempts) {
+                  if (err instanceof Error && err.message.includes('Timeout')) {
+                    console.warn('[useAuth] Final timeout - user may be creating');
+                    setUser(null);
+                  } else {
+                    throw err;
+                  }
+                }
               }
-            } catch (err) {
-              console.error('[useAuth] Error loading user:', err);
-              // Si es timeout, no mostrar error - puede estar en proceso de creación
-              if (err instanceof Error && err.message.includes('Timeout')) {
-                console.warn('[useAuth] Timeout loading user - may be creating record');
-                setUser(null);
-              } else {
-                throw err;
-              }
+            }
+            
+            if (!currentUser && alive) {
+              console.warn('[useAuth] ⚠️ Could not load user after all attempts');
+              setUser(null);
             }
           } else {
             console.log('[useAuth] No session, clearing user');

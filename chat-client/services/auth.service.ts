@@ -123,6 +123,14 @@ export class AuthService {
    */
   async getCurrentUser(): Promise<User | null> {
     console.log('[authService] getCurrentUser: Getting auth user...');
+    
+    // Verificar sesión primero
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[authService] getCurrentUser: Session check:', session ? 'exists' : 'null');
+    if (sessionError) {
+      console.error('[authService] getCurrentUser: Session error:', sessionError);
+    }
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError) {
@@ -136,7 +144,8 @@ export class AuthService {
     }
 
     console.log('[authService] getCurrentUser: Auth user found:', user.id, user.email);
-    console.log('[authService] getCurrentUser: Querying users table...');
+    console.log('[authService] getCurrentUser: Querying users table with ID:', user.id);
+    console.log('[authService] getCurrentUser: Current auth.uid() should be:', user.id);
 
     const { data: userData, error } = await supabase
       .from('users')
@@ -145,9 +154,11 @@ export class AuthService {
       .maybeSingle();
 
     if (error) {
-      console.error('[authService] getCurrentUser: Error fetching user data:', error);
+      console.error('[authService] getCurrentUser: ❌ Error fetching user data:', error);
       console.error('[authService] getCurrentUser: Error code:', error.code);
       console.error('[authService] getCurrentUser: Error message:', error.message);
+      console.error('[authService] getCurrentUser: Error details:', error.details);
+      console.error('[authService] getCurrentUser: Error hint:', error.hint);
       
       // Si el error es de RLS, puede que el usuario no exista todavía
       if (error.code === 'PGRST116' || error.message.includes('no rows')) {
@@ -163,7 +174,9 @@ export class AuthService {
     }
 
     if (!userData) {
-      console.warn('[authService] getCurrentUser: Query succeeded but no data returned');
+      console.warn('[authService] getCurrentUser: ⚠️ Query succeeded but no data returned');
+      console.warn('[authService] getCurrentUser: This means the user exists in auth.users but not in public.users');
+      console.warn('[authService] getCurrentUser: OR the RLS policy is blocking the read');
       return null;
     }
 
