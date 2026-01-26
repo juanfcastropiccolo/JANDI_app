@@ -66,6 +66,53 @@ export function OnboardingContainer() {
     updateStepData(currentStep, data);
   };
 
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <Step1Identity
+            data={onboardingData.data.identity}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 2:
+        return (
+          <Step2Shopping
+            data={onboardingData.data.shopping}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 3:
+        return (
+          <Step3Preferences
+            data={onboardingData.data.preferences}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 4:
+        return (
+          <Step4Autonomy
+            data={onboardingData.data.autonomy}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 5:
+        return (
+          <Step5Payment
+            data={onboardingData.data.payment}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12" style={{ backgroundColor: 'var(--jandi-background)' }}>
       <div className="w-full max-w-2xl">
@@ -88,59 +135,14 @@ export function OnboardingContainer() {
           </div>
         )}
 
-        {/* Steps Container with Slide Animation */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 overflow-hidden">
-          <div
-            className="flex transition-transform duration-500 ease-in-out"
-            style={{
-              transform: `translateX(-${(currentStep - 1) * 100}%)`,
-              width: '500%', // 5 pantallas × 100%
-            }}
+        {/* Steps Container with Conditional Rendering */}
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          {/* Contenedor del step actual con animación de fade */}
+          <div 
+            key={currentStep}
+            className="animate-fadeIn"
           >
-            {/* Step 1 */}
-            <div className="w-full flex-shrink-0">
-              <Step1Identity
-                data={onboardingData.data.identity}
-                onChange={handleStepDataChange}
-                onValidationChange={setCanProceed}
-              />
-            </div>
-
-            {/* Step 2 */}
-            <div className="w-full flex-shrink-0">
-              <Step2Shopping
-                data={onboardingData.data.shopping}
-                onChange={handleStepDataChange}
-                onValidationChange={setCanProceed}
-              />
-            </div>
-
-            {/* Step 3 */}
-            <div className="w-full flex-shrink-0">
-              <Step3Preferences
-                data={onboardingData.data.preferences}
-                onChange={handleStepDataChange}
-                onValidationChange={setCanProceed}
-              />
-            </div>
-
-            {/* Step 4 */}
-            <div className="w-full flex-shrink-0">
-              <Step4Autonomy
-                data={onboardingData.data.autonomy}
-                onChange={handleStepDataChange}
-                onValidationChange={setCanProceed}
-              />
-            </div>
-
-            {/* Step 5 */}
-            <div className="w-full flex-shrink-0">
-              <Step5Payment
-                data={onboardingData.data.payment}
-                onChange={handleStepDataChange}
-                onValidationChange={setCanProceed}
-              />
-            </div>
+            {renderCurrentStep()}
           </div>
 
           {/* Navigation Buttons */}

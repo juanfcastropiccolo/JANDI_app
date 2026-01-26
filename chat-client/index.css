@@ -131,6 +131,10 @@ canvas {
   animation: fadeIn 300ms ease-out;
 }
 
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
 /* Slide in from left */
 @keyframes slideInLeft {
   from {
