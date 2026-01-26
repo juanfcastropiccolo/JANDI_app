@@ -8,7 +8,7 @@ Implementación de una barra lateral desplegable (sidebar) para el chat de JANDI
 
 ## 🎨 Diseño Visual y Paleta de Colores
 
-### Paleta Principal
+### Paleta Principal 
 ```
 #332D56 - Morado oscuro (sidebar background, elementos principales)
 #4E6688 - Azul grisáceo (hover states, bordes, elementos secundarios)
