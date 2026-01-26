@@ -80,7 +80,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
   };
 
   return (
-    <div className="space-y-5 max-w-sm mx-auto px-4">
+    <div className="space-y-6">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
           Arranquemos por lo básico
@@ -103,7 +103,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleChange('nickname', e.target.value)}
             placeholder="¿Cómo querés que te llamemos?"
             autoComplete="off"
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full pl-10 pr-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
@@ -122,7 +122,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleChange('phone', e.target.value)}
             placeholder="+54 9 11 1234-5678"
             autoComplete="tel"
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full pl-10 pr-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
@@ -134,7 +134,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
           <MapPinIcon className="inline w-5 h-5 mr-1" />
           Dirección principal *
         </label>
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {/* Calle */}
           <input
             type="text"
@@ -142,7 +142,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleAddressChange('street', e.target.value)}
             placeholder="Calle y número"
             autoComplete="off"
-            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -153,7 +153,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleAddressChange('city', e.target.value)}
             placeholder="Ciudad"
             autoComplete="off"
-            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -164,7 +164,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleAddressChange('state', e.target.value)}
             placeholder="Provincia"
             autoComplete="off"
-            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -175,7 +175,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             onChange={(e) => handleAddressChange('zip', e.target.value)}
             placeholder="Código postal"
             autoComplete="off"
-            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
