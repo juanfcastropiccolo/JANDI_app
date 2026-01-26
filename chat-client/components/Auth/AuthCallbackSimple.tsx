@@ -192,74 +192,25 @@ export function AuthCallbackSimple() {
         console.log('[AuthCallbackSimple] ✅ Usuario guardado en DB');
 
         if (!alive) return;
-        setMessage('Verificando tu perfil...');
-
-        // 6. Leer el usuario de la DB para verificar onboarding
-        console.log('[AuthCallbackSimple] Leyendo usuario de DB...');
         
-        // Pequeña espera para la DB
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 6. Determinar destino según si el usuario ya existe o no
+        const destination = existingUser ? '/chat' : '/onboarding';
+        console.log('[AuthCallbackSimple] Usuario existente:', existingUser ? 'SÍ' : 'NO');
+        console.log('[AuthCallbackSimple] Destino:', destination);
         
-        // Usar timeout para la query
-        const queryWithTimeout = Promise.race([
-          supabase
-            .from('users')
-            .select('id, email, onboarding_completed')
-            .eq('id', userId)
-            .single(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout leyendo usuario')), 3000)
-          )
-        ]);
-
-        let userData;
-        try {
-          const { data, error: userError } = await queryWithTimeout as any;
-          
-          if (userError) {
-            console.error('[AuthCallbackSimple] ❌ Error leyendo usuario:', userError);
-            console.error('[AuthCallbackSimple] Error code:', userError.code);
-            console.error('[AuthCallbackSimple] Error message:', userError.message);
-            
-            if (userError.code === '42501' || userError.message.includes('permission denied')) {
-              throw new Error('ERROR RLS: No podés leer tu propio perfil. Ejecutá TEST_RLS.sql en Supabase.');
-            }
-            
-            throw userError;
-          }
-
-          if (!data) {
-            throw new Error('No se pudo cargar el perfil del usuario');
-          }
-          
-          userData = data;
-          console.log('[AuthCallbackSimple] ✅ Usuario leído de DB:', userData.email);
-          console.log('[AuthCallbackSimple] Onboarding completado:', userData.onboarding_completed);
-        } catch (err) {
-          console.error('[AuthCallbackSimple] ❌ Error o timeout en lectura:', err);
-          // Si falla la lectura, asumir que es nuevo usuario y mandar a onboarding
-          console.warn('[AuthCallbackSimple] ⚠️ Asumiendo usuario nuevo, redirigiendo a onboarding');
-          userData = { onboarding_completed: false };
-        }
-
-        if (!alive) return;
-        setMessage('¡Listo! Preparando tu experiencia...');
-
-        // 7. Refrescar la sesión para sincronizar
-        console.log('[AuthCallbackSimple] Refrescando sesión...');
+        // 7. Forzar un refresh del auth state para que useAuth lo detecte
+        console.log('[AuthCallbackSimple] Forzando refresh de auth state...');
         await supabase.auth.refreshSession();
-        console.log('[AuthCallbackSimple] ✅ Sesión refrescada');
         
-        // 8. Pequeña espera y redirigir
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 8. Pequeña espera para que el auth state se propague
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         if (!alive) return;
         
-        // 9. Redirigir según onboarding_completed
-        const destination = userData.onboarding_completed ? '/chat' : '/onboarding';
-        console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
         console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
+        console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
         
+        // 9. Redirigir inmediatamente - AuthGuard y OnboardingGuard manejarán el resto
         if (alive) {
           navigate(destination, { replace: true });
         }

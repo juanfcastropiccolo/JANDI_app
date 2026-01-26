@@ -122,88 +122,67 @@ export class AuthService {
    * Obtener usuario actual
    */
   async getCurrentUser(): Promise<User | null> {
-    console.log('[authService] getCurrentUser: Getting auth user...');
+    console.log('[authService] getCurrentUser: START');
     
     try {
-      // Verificar sesión primero
-      console.log('[authService] getCurrentUser: Step 1 - Checking session...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('[authService] getCurrentUser: Session check:', session ? 'exists' : 'null');
-      if (sessionError) {
-        console.error('[authService] getCurrentUser: Session error:', sessionError);
-      }
-      
-      console.log('[authService] getCurrentUser: Step 2 - Getting auth user...');
+      // 1. Obtener el usuario auth
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError) {
-        console.error('[authService] getCurrentUser: Error getting auth user:', authError);
+        console.error('[authService] getCurrentUser: Auth error:', authError);
         throw authError;
       }
       
       if (!user) {
-        console.log('[authService] getCurrentUser: No auth user found');
+        console.log('[authService] getCurrentUser: No auth user');
         return null;
       }
 
-      console.log('[authService] getCurrentUser: Step 3 - Auth user found:', user.id, user.email);
-      console.log('[authService] getCurrentUser: Querying users table with ID:', user.id);
-      console.log('[authService] getCurrentUser: Current auth.uid() should be:', user.id);
+      console.log('[authService] getCurrentUser: Auth user OK:', user.id);
 
-      console.log('[authService] getCurrentUser: Step 4 - About to query users table...');
+      // 2. Query simple con timeout agresivo
       const queryStartTime = Date.now();
       
-      // Crear un timeout manual para la query
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Query timeout (2s)'));
+        }, 2000); // Solo 2 segundos
+      });
+      
       const queryPromise = supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle();
+        .limit(1)
+        .single();
       
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          const error: any = new Error('Query timeout: La consulta a la base de datos tardó más de 5 segundos. Posible problema de RLS o configuración de Supabase.');
-          error.code = 'QUERY_TIMEOUT';
-          reject(error);
-        }, 5000);
-      });
-      
-      const { data: userData, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+      const result = await Promise.race([queryPromise, timeoutPromise]);
 
       const queryDuration = Date.now() - queryStartTime;
-      console.log(`[authService] getCurrentUser: Step 5 - Query completed in ${queryDuration}ms`);
+      console.log(`[authService] getCurrentUser: Query done in ${queryDuration}ms`);
+
+      const { data, error } = result as any;
 
       if (error) {
-        console.error('[authService] getCurrentUser: ❌ Error fetching user data:', error);
-        console.error('[authService] getCurrentUser: Error code:', error.code);
-        console.error('[authService] getCurrentUser: Error message:', error.message);
-        console.error('[authService] getCurrentUser: Error details:', error.details);
-        console.error('[authService] getCurrentUser: Error hint:', error.hint);
+        console.error('[authService] getCurrentUser: Query error:', error.code, error.message);
         
-        // Si el error es de RLS, puede que el usuario no exista todavía
-        if (error.code === 'PGRST116' || error.message.includes('no rows')) {
-          console.warn('[authService] getCurrentUser: User not found in DB (PGRST116)');
+        if (error.code === 'PGRST116') {
+          console.warn('[authService] getCurrentUser: User not in DB yet');
           return null;
-        }
-        
-        if (error.code === '42501' || error.message.includes('permission denied')) {
-          console.error('[authService] getCurrentUser: RLS PERMISSION DENIED - check policies!');
         }
         
         throw error;
       }
 
-      if (!userData) {
-        console.warn('[authService] getCurrentUser: ⚠️ Query succeeded but no data returned');
-        console.warn('[authService] getCurrentUser: This means the user exists in auth.users but not in public.users');
-        console.warn('[authService] getCurrentUser: OR the RLS policy is blocking the read');
+      if (!data) {
+        console.warn('[authService] getCurrentUser: No data returned');
         return null;
       }
 
-      console.log('[authService] getCurrentUser: ✅ User data loaded successfully:', userData.email);
-      return userData as User;
+      console.log('[authService] getCurrentUser: ✅ SUCCESS:', data.email);
+      return data as User;
     } catch (err) {
-      console.error('[authService] getCurrentUser: ❌ CAUGHT ERROR:', err);
+      console.error('[authService] getCurrentUser: ❌ ERROR:', err);
       throw err;
     }
   }

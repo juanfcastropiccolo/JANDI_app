@@ -52,65 +52,34 @@ export function useAuth() {
           if (session?.user) {
             console.log('[useAuth] Session found, loading user...');
             
-            // Reintentar hasta 5 veces si no encuentra el usuario (aumentado de 3 a 5)
-            let currentUser = null;
-            let attempts = 0;
-            const maxAttempts = 5;
-            
-            while (!currentUser && attempts < maxAttempts && alive) {
-              attempts++;
-              console.log(`[useAuth] Intento ${attempts}/${maxAttempts} de cargar usuario...`);
-              
-              // Esperar progresivamente más tiempo en cada intento
-              if (attempts === 1) {
-                await new Promise(resolve => setTimeout(resolve, 500)); // 500ms
-              } else if (attempts === 2) {
-                await new Promise(resolve => setTimeout(resolve, 1000)); // 1s
-              } else if (attempts === 3) {
-                await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s
-              } else {
-                await new Promise(resolve => setTimeout(resolve, 2000)); // 2s
-              }
+            // Intentar cargar el usuario con un solo intento y timeout corto
+            try {
+              const currentUser = await withTimeout(
+                authService.getCurrentUser(),
+                3000, // 3 segundos máximo
+                'Timeout al cargar usuario'
+              );
               
               if (!alive) return;
               
-              try {
-                currentUser = await withTimeout(
-                  authService.getCurrentUser(),
-                  6000, // 6 segundos - si tarda más, hay un problema de RLS
-                  'Timeout al cargar usuario'
-                );
-                
-                if (!alive) return;
-                
-                if (currentUser) {
-                  console.log(`[useAuth] ✅ User loaded successfully in attempt ${attempts}:`, currentUser.email);
-                  setUser(currentUser);
-                  setError(null);
-                  break;
-                } else {
-                  console.warn(`[useAuth] ⚠️ Attempt ${attempts}: getCurrentUser returned null`);
-                  if (attempts < maxAttempts) {
-                    console.log('[useAuth] User not found yet, will retry...');
-                  }
-                }
-              } catch (err) {
-                console.error(`[useAuth] Error loading user in attempt ${attempts}:`, err);
-                // Si es el último intento, manejar el error
-                if (attempts >= maxAttempts) {
-                  if (err instanceof Error && err.message.includes('Timeout')) {
-                    console.warn('[useAuth] Final timeout - user may be creating');
-                    setUser(null);
-                  } else {
-                    throw err;
-                  }
-                }
+              if (currentUser) {
+                console.log(`[useAuth] ✅ User loaded successfully:`, currentUser.email);
+                setUser(currentUser);
+                setError(null);
+              } else {
+                console.warn(`[useAuth] ⚠️ getCurrentUser returned null - user may still be creating`);
+                // No establecer user como null todavía, dejar que el AuthGuard espere
               }
-            }
-            
-            if (!currentUser && alive) {
-              console.warn('[useAuth] ⚠️ Could not load user after all attempts');
-              setUser(null);
+            } catch (err) {
+              console.error(`[useAuth] ❌ Error loading user:`, err);
+              
+              // Si es timeout o el usuario no existe todavía, no es un error crítico
+              if (err instanceof Error && (err.message.includes('Timeout') || err.message.includes('Query timeout'))) {
+                console.warn('[useAuth] ⚠️ Timeout loading user - will not set error, AuthGuard will handle');
+                // No establecer error, dejar que AuthGuard maneje con su propio timeout
+              } else {
+                throw err;
+              }
             }
           } else {
             console.log('[useAuth] No session, clearing user');
