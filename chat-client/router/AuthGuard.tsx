@@ -30,10 +30,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
   React.useEffect(() => {
     // Dar tiempo extra para que la autenticación se complete
     // Esto es importante después del callback de OAuth
+    // Aumentado a 10 segundos para dar más tiempo al proceso de OAuth
     const timer = setTimeout(() => {
       console.log('[AuthGuard] Timer finished, user:', user ? user.email : 'null');
       setWaitingForAuth(false);
-    }, 5000); // Esperar hasta 5 segundos antes de redirigir a login
+    }, 10000); // Esperar hasta 10 segundos antes de redirigir a login
 
     return () => clearTimeout(timer);
   }, [user]);

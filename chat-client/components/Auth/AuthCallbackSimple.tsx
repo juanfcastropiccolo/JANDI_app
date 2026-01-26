@@ -191,23 +191,14 @@ export function AuthCallbackSimple() {
 
         console.log('[AuthCallbackSimple] ✅ Usuario guardado en DB');
 
-        // Refrescar la sesión para asegurar que RLS tenga los permisos actualizados
-        console.log('[AuthCallbackSimple] Refrescando sesión...');
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.warn('[AuthCallbackSimple] ⚠️ Error refrescando sesión:', refreshError);
-        } else {
-          console.log('[AuthCallbackSimple] ✅ Sesión refrescada');
-        }
-
         if (!alive) return;
         setMessage('Cargando tu perfil...');
 
         // 6. Leer el usuario de la DB para verificar onboarding
         console.log('[AuthCallbackSimple] Leyendo usuario de DB...');
         
-        // Esperar un poco para que la DB se sincronice
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Esperar un poco más para que la DB se sincronice completamente
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -237,14 +228,23 @@ export function AuthCallbackSimple() {
         if (!alive) return;
         setMessage('¡Listo! Preparando tu experiencia...');
 
-        // 7. Esperar a que useAuth detecte la sesión y cargue el usuario
+        // 7. Refrescar la sesión DESPUÉS de verificar que el usuario existe en DB
+        // Esto fuerza a que onAuthStateChange se dispare con los datos actualizados
+        console.log('[AuthCallbackSimple] Refrescando sesión para sincronizar contexto...');
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.warn('[AuthCallbackSimple] ⚠️ Error refrescando sesión:', refreshError);
+        } else {
+          console.log('[AuthCallbackSimple] ✅ Sesión refrescada - esto disparará onAuthStateChange');
+        }
+        
+        // 8. Esperar más tiempo para que useAuth procese el refresh y cargue el usuario
         console.log('[AuthCallbackSimple] Esperando a que useAuth sincronice...');
-        // Aumentar el tiempo de espera para asegurar que useAuth tenga chance de cargar
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         if (!alive) return;
         
-        // 8. Redirigir según onboarding_completed
+        // 9. Redirigir según onboarding_completed
         const destination = userData.onboarding_completed ? '/chat' : '/onboarding';
         console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
         console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');

@@ -52,20 +52,24 @@ export function useAuth() {
           if (session?.user) {
             console.log('[useAuth] Session found, loading user...');
             
-            // Reintentar hasta 3 veces si no encuentra el usuario
+            // Reintentar hasta 5 veces si no encuentra el usuario (aumentado de 3 a 5)
             let currentUser = null;
             let attempts = 0;
-            const maxAttempts = 3;
+            const maxAttempts = 5;
             
             while (!currentUser && attempts < maxAttempts && alive) {
               attempts++;
               console.log(`[useAuth] Intento ${attempts}/${maxAttempts} de cargar usuario...`);
               
-              // Esperar un poco antes de cada intento (excepto el primero)
-              if (attempts > 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+              // Esperar progresivamente más tiempo en cada intento
+              if (attempts === 1) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // 500ms
+              } else if (attempts === 2) {
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 1s
+              } else if (attempts === 3) {
+                await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s
               } else {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2s
               }
               
               if (!alive) return;
@@ -73,7 +77,7 @@ export function useAuth() {
               try {
                 currentUser = await withTimeout(
                   authService.getCurrentUser(),
-                  10000,
+                  15000, // Aumentado a 15 segundos
                   'Timeout al cargar usuario'
                 );
                 
