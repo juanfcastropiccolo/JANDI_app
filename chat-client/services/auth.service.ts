@@ -122,68 +122,53 @@ export class AuthService {
    * Obtener usuario actual
    */
   async getCurrentUser(): Promise<User | null> {
-    try {
-      console.log('[authService] getCurrentUser: Getting auth user...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError) {
-        console.error('[authService] getCurrentUser: Error getting auth user:', authError);
-        throw authError;
-      }
-      
-      if (!user) {
-        console.log('[authService] getCurrentUser: No auth user found');
-        return null;
-      }
-
-      console.log('[authService] getCurrentUser: Auth user found:', user.id, user.email);
-      console.log('[authService] getCurrentUser: Querying users table...');
-
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[authService] getCurrentUser: Error fetching user data:', error);
-        console.error('[authService] getCurrentUser: Error code:', error.code);
-        console.error('[authService] getCurrentUser: Error message:', error.message);
-        
-        // Si el error es de RLS, puede que el usuario no exista todavía
-        if (error.code === 'PGRST116' || error.message.includes('no rows')) {
-          console.warn('[authService] getCurrentUser: User not found in DB (PGRST116)');
-          return null;
-        }
-        
-        if (error.code === '42501' || error.message.includes('permission denied')) {
-          console.error('[authService] getCurrentUser: RLS PERMISSION DENIED - check policies!');
-        }
-        
-        throw error;
-      }
-
-      if (!userData) {
-        console.warn('[authService] getCurrentUser: Query succeeded but no data returned');
-        return null;
-      }
-
-      console.log('[authService] getCurrentUser: ✅ User data loaded successfully:', userData.email);
-      return userData as User;
-    } catch (err) {
-      console.error('[authService] getCurrentUser: Exception caught:', err);
-      
-      if (err instanceof Error) {
-        console.error('[authService] getCurrentUser: Error name:', err.name);
-        console.error('[authService] getCurrentUser: Error message:', err.message);
-      }
-      
-      // Si es AbortError, propagarlo para que useAuth lo maneje
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw err;
-      }
+    console.log('[authService] getCurrentUser: Getting auth user...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('[authService] getCurrentUser: Error getting auth user:', authError);
+      throw authError;
+    }
+    
+    if (!user) {
+      console.log('[authService] getCurrentUser: No auth user found');
       return null;
     }
+
+    console.log('[authService] getCurrentUser: Auth user found:', user.id, user.email);
+    console.log('[authService] getCurrentUser: Querying users table...');
+
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[authService] getCurrentUser: Error fetching user data:', error);
+      console.error('[authService] getCurrentUser: Error code:', error.code);
+      console.error('[authService] getCurrentUser: Error message:', error.message);
+      
+      // Si el error es de RLS, puede que el usuario no exista todavía
+      if (error.code === 'PGRST116' || error.message.includes('no rows')) {
+        console.warn('[authService] getCurrentUser: User not found in DB (PGRST116)');
+        return null;
+      }
+      
+      if (error.code === '42501' || error.message.includes('permission denied')) {
+        console.error('[authService] getCurrentUser: RLS PERMISSION DENIED - check policies!');
+      }
+      
+      throw error;
+    }
+
+    if (!userData) {
+      console.warn('[authService] getCurrentUser: Query succeeded but no data returned');
+      return null;
+    }
+
+    console.log('[authService] getCurrentUser: ✅ User data loaded successfully:', userData.email);
+    return userData as User;
   }
 
   /**
