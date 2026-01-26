@@ -21,7 +21,7 @@ interface Step6AccessCodeProps {
   data: {
     accessCode?: string;
   };
-  onChange: (data: { accessCode: string }) => void;
+  onChange: (data: { accessCode: { accessCode: string } }) => void;
   onValidationChange: (isValid: boolean) => void;
 }
 
@@ -63,7 +63,9 @@ export function Step6AccessCode({ data, onChange, onValidationChange }: Step6Acc
       if (hash === ACCESS_CODE_HASH) {
         setError('');
         onValidationChange(true);
-        onChange({ accessCode });
+        // Persistir en el estado global con la misma forma que espera el submit:
+        // OnboardingData.data.accessCode = { accessCode: string }
+        onChange({ accessCode: { accessCode } });
       } else {
         setError('Código de acceso incorrecto');
         onValidationChange(false);

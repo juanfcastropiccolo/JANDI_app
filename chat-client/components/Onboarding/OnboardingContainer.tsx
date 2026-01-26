@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -79,9 +79,12 @@ export function OnboardingContainer() {
     goToPreviousStep();
   };
 
-  const handleStepDataChange = (data: any) => {
-    updateStepData(currentStep, data);
-  };
+  const handleStepDataChange = useCallback(
+    (data: any) => {
+      updateStepData(currentStep, data);
+    },
+    [currentStep, updateStepData],
+  );
 
   const renderCurrentStep = () => {
     switch (currentStep) {

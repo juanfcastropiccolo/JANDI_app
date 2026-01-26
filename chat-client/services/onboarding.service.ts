@@ -22,8 +22,9 @@ export class OnboardingService {
    * Validar código de acceso (hash SHA-256)
    */
   private async validateAccessCode(code: string): Promise<boolean> {
+    const normalized = (code ?? '').trim().toLowerCase();
     const encoder = new TextEncoder();
-    const data = encoder.encode(code);
+    const data = encoder.encode(normalized);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
