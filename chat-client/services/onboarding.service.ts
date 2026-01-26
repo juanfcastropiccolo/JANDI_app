@@ -28,8 +28,8 @@ export class OnboardingService {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
     
-    // Hash SHA-256 del código válido
-    const validHash = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918';
+    // Hash SHA-256 del código válido "gala123"
+    const validHash = 'b2760c8bd755fbc25864da592d01cd8464f97b821613b94539c0cb35860468cc';
     return hash === validHash;
   }
 
