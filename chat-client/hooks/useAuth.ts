@@ -57,11 +57,43 @@ export function useAuth() {
             if (!alive) return;
             
             console.log('[useAuth] Calling authService.getCurrentUser()...');
-            const currentUser = await withTimeout(
-              authService.getCurrentUser(),
-              10000,
-              'Timeout al cargar el usuario'
-            );
+            
+            // Reintentar con backoff si falla
+            let currentUser = null;
+            let attempts = 0;
+            const maxAttempts = 5;
+            
+            while (!currentUser && attempts < maxAttempts && alive) {
+              attempts++;
+              console.log(`[useAuth] Intento ${attempts}/${maxAttempts} de cargar usuario...`);
+              
+              try {
+                currentUser = await withTimeout(
+                  authService.getCurrentUser(),
+                  8000,
+                  `Timeout en intento ${attempts}`
+                );
+                
+                if (currentUser) {
+                  console.log(`[useAuth] ✅ Usuario cargado en intento ${attempts}`);
+                  break;
+                }
+                
+                // Si no hay usuario, esperar antes de reintentar
+                if (attempts < maxAttempts) {
+                  console.log('[useAuth] Usuario no encontrado, esperando antes de reintentar...');
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+              } catch (err) {
+                console.warn(`[useAuth] Error en intento ${attempts}:`, err);
+                
+                if (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                  throw err; // Lanzar error solo en el último intento
+                }
+              }
+            }
             
             if (!alive) return;
             

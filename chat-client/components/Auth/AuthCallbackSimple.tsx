@@ -245,15 +245,18 @@ export function AuthCallbackSimple() {
         }
 
         if (!alive) return;
-        setMessage('¡Listo! Redirigiendo...');
+        setMessage('¡Listo! Preparando tu experiencia...');
 
-        // 7. Redirigir según onboarding_completed
+        // 7. Esperar a que useAuth detecte la sesión
+        console.log('[AuthCallbackSimple] Esperando a que useAuth sincronice...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        if (!alive) return;
+        
+        // 8. Redirigir según onboarding_completed
         const destination = userData.onboarding_completed ? '/chat' : '/onboarding';
         console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
         console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-        
-        // Dar un momento para que el mensaje se muestre
-        await new Promise(resolve => setTimeout(resolve, 300));
         
         if (alive) {
           navigate(destination, { replace: true });

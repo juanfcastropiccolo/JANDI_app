@@ -25,8 +25,20 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuthContext();
+  const [waitingForAuth, setWaitingForAuth] = React.useState(true);
 
-  if (loading) {
+  React.useEffect(() => {
+    // Dar tiempo extra para que la autenticación se complete
+    // Esto es importante después del callback de OAuth
+    const timer = setTimeout(() => {
+      setWaitingForAuth(false);
+    }, 3000); // Esperar hasta 3 segundos antes de redirigir a login
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Mostrar loading mientras carga o mientras esperamos
+  if (loading || (waitingForAuth && !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--jandi-background)' }}>
         <LoadingSpinner size="lg" />
@@ -34,9 +46,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
+  // Solo redirigir a login si definitivamente no hay usuario después de esperar
   if (!user) {
+    console.log('[AuthGuard] No user found after waiting, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
+  console.log('[AuthGuard] User authenticated:', user.email);
   return <>{children}</>;
 }
