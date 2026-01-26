@@ -77,7 +77,7 @@ export function useAuth() {
               try {
                 currentUser = await withTimeout(
                   authService.getCurrentUser(),
-                  15000, // Aumentado a 15 segundos
+                  6000, // 6 segundos - si tarda más, hay un problema de RLS
                   'Timeout al cargar usuario'
                 );
                 

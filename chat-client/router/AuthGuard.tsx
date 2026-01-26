@@ -26,18 +26,30 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuthContext();
   const [waitingForAuth, setWaitingForAuth] = React.useState(true);
+  const [timeoutExpired, setTimeoutExpired] = React.useState(false);
 
   React.useEffect(() => {
-    // Dar tiempo extra para que la autenticación se complete
-    // Esto es importante después del callback de OAuth
-    // Aumentado a 10 segundos para dar más tiempo al proceso de OAuth
-    const timer = setTimeout(() => {
-      console.log('[AuthGuard] Timer finished, user:', user ? user.email : 'null');
+    // Si ya tenemos usuario, no necesitamos esperar
+    if (user) {
+      console.log('[AuthGuard] User found immediately:', user.email);
       setWaitingForAuth(false);
-    }, 10000); // Esperar hasta 10 segundos antes de redirigir a login
+      setTimeoutExpired(false);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [user]);
+    // Si no hay usuario, esperar hasta 15 segundos
+    console.log('[AuthGuard] Starting timer, waiting for user...');
+    const timer = setTimeout(() => {
+      console.log('[AuthGuard] Timer finished after 15s, user:', user ? user.email : 'null');
+      setWaitingForAuth(false);
+      setTimeoutExpired(true);
+    }, 15000); // 15 segundos
+
+    return () => {
+      console.log('[AuthGuard] Cleaning up timer');
+      clearTimeout(timer);
+    };
+  }, [user]); // Reiniciar el timer cada vez que cambia user
 
   // Mostrar loading mientras carga o mientras esperamos
   if (loading || (waitingForAuth && !user)) {
@@ -49,11 +61,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   // Solo redirigir a login si definitivamente no hay usuario después de esperar
-  if (!user) {
-    console.log('[AuthGuard] No user found after waiting, redirecting to login');
+  if (!user && timeoutExpired) {
+    console.log('[AuthGuard] No user found after timeout expired, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
-  console.log('[AuthGuard] User authenticated:', user.email);
-  return <>{children}</>;
+  // Si tenemos usuario, renderizar children
+  if (user) {
+    console.log('[AuthGuard] User authenticated:', user.email);
+    return <>{children}</>;
+  }
+
+  // Caso fallback: mostrar loading
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--jandi-background)' }}>
+      <LoadingSpinner size="lg" />
+    </div>
+  );
 }

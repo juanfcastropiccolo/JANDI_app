@@ -192,55 +192,66 @@ export function AuthCallbackSimple() {
         console.log('[AuthCallbackSimple] ✅ Usuario guardado en DB');
 
         if (!alive) return;
-        setMessage('Cargando tu perfil...');
+        setMessage('Verificando tu perfil...');
 
         // 6. Leer el usuario de la DB para verificar onboarding
         console.log('[AuthCallbackSimple] Leyendo usuario de DB...');
         
-        // Esperar un poco más para que la DB se sincronice completamente
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Pequeña espera para la DB
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id, email, onboarding_completed')
-          .eq('id', userId)
-          .single();
+        // Usar timeout para la query
+        const queryWithTimeout = Promise.race([
+          supabase
+            .from('users')
+            .select('id, email, onboarding_completed')
+            .eq('id', userId)
+            .single(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout leyendo usuario')), 3000)
+          )
+        ]);
 
-        if (userError) {
-          console.error('[AuthCallbackSimple] ❌ Error leyendo usuario:', userError);
-          console.error('[AuthCallbackSimple] Error code:', userError.code);
-          console.error('[AuthCallbackSimple] Error message:', userError.message);
+        let userData;
+        try {
+          const { data, error: userError } = await queryWithTimeout as any;
           
-          if (userError.code === '42501' || userError.message.includes('permission denied')) {
-            throw new Error('ERROR RLS: No podés leer tu propio perfil. Ejecutá TEST_RLS.sql en Supabase.');
+          if (userError) {
+            console.error('[AuthCallbackSimple] ❌ Error leyendo usuario:', userError);
+            console.error('[AuthCallbackSimple] Error code:', userError.code);
+            console.error('[AuthCallbackSimple] Error message:', userError.message);
+            
+            if (userError.code === '42501' || userError.message.includes('permission denied')) {
+              throw new Error('ERROR RLS: No podés leer tu propio perfil. Ejecutá TEST_RLS.sql en Supabase.');
+            }
+            
+            throw userError;
+          }
+
+          if (!data) {
+            throw new Error('No se pudo cargar el perfil del usuario');
           }
           
-          throw userError;
+          userData = data;
+          console.log('[AuthCallbackSimple] ✅ Usuario leído de DB:', userData.email);
+          console.log('[AuthCallbackSimple] Onboarding completado:', userData.onboarding_completed);
+        } catch (err) {
+          console.error('[AuthCallbackSimple] ❌ Error o timeout en lectura:', err);
+          // Si falla la lectura, asumir que es nuevo usuario y mandar a onboarding
+          console.warn('[AuthCallbackSimple] ⚠️ Asumiendo usuario nuevo, redirigiendo a onboarding');
+          userData = { onboarding_completed: false };
         }
-
-        if (!userData) {
-          throw new Error('No se pudo cargar el perfil del usuario');
-        }
-
-        console.log('[AuthCallbackSimple] ✅ Usuario leído de DB:', userData.email);
-        console.log('[AuthCallbackSimple] Onboarding completado:', userData.onboarding_completed);
 
         if (!alive) return;
         setMessage('¡Listo! Preparando tu experiencia...');
 
-        // 7. Refrescar la sesión DESPUÉS de verificar que el usuario existe en DB
-        // Esto fuerza a que onAuthStateChange se dispare con los datos actualizados
-        console.log('[AuthCallbackSimple] Refrescando sesión para sincronizar contexto...');
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          console.warn('[AuthCallbackSimple] ⚠️ Error refrescando sesión:', refreshError);
-        } else {
-          console.log('[AuthCallbackSimple] ✅ Sesión refrescada - esto disparará onAuthStateChange');
-        }
+        // 7. Refrescar la sesión para sincronizar
+        console.log('[AuthCallbackSimple] Refrescando sesión...');
+        await supabase.auth.refreshSession();
+        console.log('[AuthCallbackSimple] ✅ Sesión refrescada');
         
-        // 8. Esperar más tiempo para que useAuth procese el refresh y cargue el usuario
-        console.log('[AuthCallbackSimple] Esperando a que useAuth sincronice...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // 8. Pequeña espera y redirigir
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         if (!alive) return;
         
