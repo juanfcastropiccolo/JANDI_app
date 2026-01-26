@@ -26,51 +26,51 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuthContext();
   const [initialCheckDone, setInitialCheckDone] = React.useState(false);
+  const startTimeRef = React.useRef(Date.now());
 
-  // Hacer un check inicial con timeout de seguridad
+  // Hacer un check inicial con timeout de seguridad mejorado
   React.useEffect(() => {
-    // Si ya tenemos usuario inmediatamente, marcar como completado
+    const elapsedTime = Date.now() - startTimeRef.current;
+    
+    // Si ya tenemos usuario, marcar como completado inmediatamente
     if (user) {
-      console.log('[AuthGuard] User found immediately:', user.email);
+      console.log(`[AuthGuard] ✅ User found after ${elapsedTime}ms:`, user.email);
       setInitialCheckDone(true);
       return;
     }
 
-    // Si loading terminó y no hay usuario, marcar como completado
-    if (!loading && !user) {
-      console.log('[AuthGuard] Loading finished, no user found');
-      setInitialCheckDone(true);
-      return;
-    }
-
-    // Timer de seguridad: después de 8 segundos, marcar como completado de todas formas
+    // Timer de seguridad: después de 12 segundos, marcar como completado
+    // Eliminamos el check rápido de !loading && !user para evitar race conditions
     const safetyTimer = setTimeout(() => {
-      console.log('[AuthGuard] Safety timeout reached after 8s');
+      const finalElapsed = Date.now() - startTimeRef.current;
+      console.log(`[AuthGuard] ⏱️ Safety timeout reached after ${finalElapsed}ms, user:`, user ? user.email : 'null');
       setInitialCheckDone(true);
-    }, 8000);
+    }, 12000); // Aumentado de 8s a 12s
 
     return () => clearTimeout(safetyTimer);
   }, [user, loading]);
 
-  // Mostrar loading mientras:
-  // 1. El auth está cargando inicialmente
-  // 2. No hemos completado el check inicial
-  // 3. No tenemos certeza del estado del usuario
-  if (!initialCheckDone || (loading && !user)) {
+  // Mostrar loading mientras no hayamos completado el check inicial
+  if (!initialCheckDone) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--jandi-background)' }}>
-        <LoadingSpinner size="lg" />
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-sm" style={{ color: 'var(--jandi-gray)' }}>
+            Verificando autenticación...
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Si el check terminó y NO hay usuario, redirigir inmediatamente
+  // Si el check terminó y NO hay usuario, redirigir a login
   if (!user) {
-    console.log('[AuthGuard] No user found, redirecting to login');
+    console.log('[AuthGuard] ❌ No user found after check, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   // Usuario autenticado, renderizar children
-  console.log('[AuthGuard] User authenticated:', user.email);
+  console.log('[AuthGuard] ✅ User authenticated:', user.email, 'onboarding:', user.onboarding_completed);
   return <>{children}</>;
 }

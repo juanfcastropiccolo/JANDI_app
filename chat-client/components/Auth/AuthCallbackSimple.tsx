@@ -132,10 +132,11 @@ export function AuthCallbackSimple() {
 /**
  * Función auxiliar para redirigir al usuario
  * 
- * NO hacemos queries a la DB aquí porque:
- * 1. El usuario ya se crea automáticamente en la tabla users
- * 2. Las queries con RLS pueden tardar mucho (race condition)
- * 3. El AuthGuard y OnboardingGuard manejarán la lógica de redirección correcta
+ * Redirigimos a /chat y dejamos que el OnboardingGuard se encargue de:
+ * - Si el usuario NO completó onboarding → redirige a /onboarding
+ * - Si el usuario SÍ completó onboarding → permite acceso a /chat
+ * 
+ * Esto funciona tanto para usuarios nuevos como para usuarios existentes.
  */
 async function handleUserProfile(
   user: any, 
@@ -149,14 +150,14 @@ async function handleUserProfile(
 
     console.log('[AuthCallbackSimple] Usuario autenticado:', user.email);
     
-    // Redirigir a onboarding - El OnboardingGuard se encargará de verificar
-    // si el usuario ya completó el onboarding y lo mandará a /chat si corresponde
-    console.log('[AuthCallbackSimple] Redirigiendo a: /onboarding');
-    console.log('[AuthCallbackSimple] (El OnboardingGuard verificará si ya completó onboarding)');
+    // Redirigir a /chat - El OnboardingGuard verificará automáticamente
+    // si el usuario necesita completar el onboarding
+    console.log('[AuthCallbackSimple] Redirigiendo a: /chat');
+    console.log('[AuthCallbackSimple] (El OnboardingGuard verificará estado de onboarding)');
     console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
     
     if (alive) {
-      navigate('/onboarding', { replace: true });
+      navigate('/chat', { replace: true });
     }
   } catch (err) {
     console.error('[AuthCallbackSimple] Error en handleUserProfile:', err);

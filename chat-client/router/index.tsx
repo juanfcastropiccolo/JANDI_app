@@ -15,7 +15,7 @@
  */
 
 import React from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useNavigate } from 'react-router-dom';
 import { AuthGuard } from './AuthGuard';
 import { OnboardingGuard } from './OnboardingGuard';
 import { LandingPage } from '../components/Auth/LandingPage';
@@ -28,35 +28,90 @@ import { BusinessLanding } from '../components/Business/BusinessLanding';
 import { BusinessRegister } from '../components/Business/BusinessRegister';
 import App from '../App';
 
+// Componentes wrapper que usan useNavigate para evitar recargas de página
+
+function LandingRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <LandingPage
+      onNavigateToLogin={() => navigate('/login')}
+      onNavigateToRegister={() => navigate('/register')}
+      onNavigateToBusiness={() => navigate('/business')}
+    />
+  );
+}
+
+function LoginRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <LoginForm
+      onNavigateToRegister={() => navigate('/register')}
+      onNavigateToForgotPassword={() => navigate('/forgot-password')}
+      onLoginSuccess={() => navigate('/chat', { replace: true })}
+    />
+  );
+}
+
+function RegisterRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <RegisterForm
+      onNavigateToLogin={() => navigate('/login')}
+      onRegisterSuccess={() => navigate('/onboarding', { replace: true })}
+    />
+  );
+}
+
+function ForgotPasswordRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <ForgotPassword
+      onNavigateToLogin={() => navigate('/login')}
+    />
+  );
+}
+
+function BusinessLandingRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <BusinessLanding
+      onNavigateToRegister={() => navigate('/business/register')}
+      onNavigateToHome={() => navigate('/')}
+    />
+  );
+}
+
+function BusinessRegisterRoute() {
+  const navigate = useNavigate();
+  
+  return (
+    <BusinessRegister
+      onNavigateBack={() => navigate('/business')}
+    />
+  );
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage 
-      onNavigateToLogin={() => window.location.href = '/login'}
-      onNavigateToRegister={() => window.location.href = '/register'}
-      onNavigateToBusiness={() => window.location.href = '/business'}
-    />,
+    element: <LandingRoute />,
   },
   {
     path: '/login',
-    element: <LoginForm
-      onNavigateToRegister={() => window.location.href = '/register'}
-      onNavigateToForgotPassword={() => window.location.href = '/forgot-password'}
-      onLoginSuccess={() => window.location.href = '/chat'}
-    />,
+    element: <LoginRoute />,
   },
   {
     path: '/register',
-    element: <RegisterForm
-      onNavigateToLogin={() => window.location.href = '/login'}
-      onRegisterSuccess={() => window.location.href = '/onboarding'}
-    />,
+    element: <RegisterRoute />,
   },
   {
     path: '/forgot-password',
-    element: <ForgotPassword
-      onNavigateToLogin={() => window.location.href = '/login'}
-    />,
+    element: <ForgotPasswordRoute />,
   },
   {
     path: '/auth/callback',
@@ -82,16 +137,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/business',
-    element: <BusinessLanding
-      onNavigateToRegister={() => window.location.href = '/business/register'}
-      onNavigateToHome={() => window.location.href = '/'}
-    />,
+    element: <BusinessLandingRoute />,
   },
   {
     path: '/business/register',
-    element: <BusinessRegister
-      onNavigateBack={() => window.location.href = '/business'}
-    />,
+    element: <BusinessRegisterRoute />,
   },
   {
     path: '*',
