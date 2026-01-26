@@ -26,7 +26,7 @@ interface Step6AccessCodeProps {
 }
 
 // Código de acceso hasheado para seguridad
-const ACCESS_CODE_HASH = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918'; // SHA-256 de "gala123"
+const ACCESS_CODE_HASH = 'b2760c8bd755fbc25864da592d01cd8464f97b821613b94539c0cb35860468cc'; // SHA-256 de "gala123"
 
 function hashCode(code: string): Promise<string> {
   const encoder = new TextEncoder();
