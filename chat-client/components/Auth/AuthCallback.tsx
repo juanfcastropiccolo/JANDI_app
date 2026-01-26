@@ -126,6 +126,7 @@ export function AuthCallback() {
 
   useEffect(() => {
     let alive = true;
+    const abortController = new AbortController();
 
     (async () => {
       try {
@@ -150,7 +151,12 @@ export function AuthCallback() {
           processedCodeRef.current = code;
 
           console.log('[AuthCallback] Found code, exchanging for session...');
-          setMessage('Autenticando con Google...');
+          setMessage('Intercambiando código de autenticación...');
+          
+          // Dar un pequeño delay para evitar race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          if (!alive) return;
           
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
@@ -192,6 +198,8 @@ export function AuthCallback() {
         
         console.log('[AuthCallback] Session verified, user:', session.user.email);
 
+        if (!alive) return;
+
         setMessage('Creando tu perfil...');
         await ensureUserRowExists();
 
@@ -218,12 +226,21 @@ export function AuthCallback() {
         
         const destination = currentUser.onboarding_completed ? '/chat' : '/onboarding';
         console.log('[AuthCallback] Navigating to:', destination);
+        
+        // Pequeño delay antes de navegar para mostrar el mensaje
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (!alive) return;
         navigate(destination, { replace: true });
 
       } catch (err) {
         console.error('[AuthCallback] Error in callback flow:', err);
-        // Ignorar AbortError
-        if (err instanceof Error && err.name === 'AbortError') return;
+        
+        // Ignorar AbortError silenciosamente
+        if (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted'))) {
+          console.log('[AuthCallback] Request was aborted, this is normal on unmount');
+          return;
+        }
 
         const errorMessage = err instanceof Error ? err.message : 'Error procesando la autenticación';
         if (!alive) return;
@@ -239,6 +256,7 @@ export function AuthCallback() {
 
     return () => {
       alive = false;
+      abortController.abort();
     };
   }, [navigate]);
 

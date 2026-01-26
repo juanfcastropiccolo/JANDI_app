@@ -194,28 +194,55 @@ export function AuthCallbackSimple() {
         if (!alive) return;
         setMessage('Cargando tu perfil...');
 
-        // 6. Leer el usuario de la DB para verificar onboarding
+        // 6. Leer el usuario de la DB para verificar onboarding (con reintentos)
         console.log('[AuthCallbackSimple] Leyendo usuario de DB...');
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id, email, onboarding_completed')
-          .eq('id', userId)
-          .single();
-
-        if (userError) {
-          console.error('[AuthCallbackSimple] ❌ Error leyendo usuario:', userError);
-          console.error('[AuthCallbackSimple] Error code:', userError.code);
-          console.error('[AuthCallbackSimple] Error message:', userError.message);
+        let userData = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (!userData && attempts < maxAttempts && alive) {
+          attempts++;
+          console.log(`[AuthCallbackSimple] Intento ${attempts}/${maxAttempts} de leer usuario...`);
           
-          if (userError.code === '42501' || userError.message.includes('permission denied')) {
-            throw new Error('ERROR RLS: No podés leer tu propio perfil. Ejecutá TEST_RLS.sql en Supabase.');
+          const { data, error: userError } = await supabase
+            .from('users')
+            .select('id, email, onboarding_completed')
+            .eq('id', userId)
+            .maybeSingle();
+
+          if (userError) {
+            console.error('[AuthCallbackSimple] ❌ Error leyendo usuario:', userError);
+            console.error('[AuthCallbackSimple] Error code:', userError.code);
+            console.error('[AuthCallbackSimple] Error message:', userError.message);
+            
+            if (userError.code === '42501' || userError.message.includes('permission denied')) {
+              throw new Error('ERROR RLS: No podés leer tu propio perfil. Ejecutá TEST_RLS.sql en Supabase.');
+            }
+            
+            // Si es el último intento, lanzar el error
+            if (attempts >= maxAttempts) {
+              throw userError;
+            }
+            
+            // Esperar antes de reintentar
+            console.warn('[AuthCallbackSimple] ⚠️ Reintentando en 1 segundo...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
           }
           
-          throw userError;
+          if (data) {
+            userData = data;
+            console.log('[AuthCallbackSimple] ✅ Usuario leído de DB:', data.email);
+            console.log('[AuthCallbackSimple] Onboarding completado:', data.onboarding_completed);
+          } else {
+            console.warn('[AuthCallbackSimple] ⚠️ Usuario no encontrado todavía, reintentando...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         }
 
-        console.log('[AuthCallbackSimple] ✅ Usuario leído de DB:', userData.email);
-        console.log('[AuthCallbackSimple] Onboarding completado:', userData.onboarding_completed);
+        if (!userData) {
+          throw new Error('No se pudo cargar el perfil del usuario después de varios intentos');
+        }
 
         if (!alive) return;
         setMessage('¡Listo! Redirigiendo...');
@@ -225,9 +252,12 @@ export function AuthCallbackSimple() {
         console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
         console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
         
-        setTimeout(() => {
-          if (alive) navigate(destination, { replace: true });
-        }, 500);
+        // Dar un momento para que el mensaje se muestre
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (alive) {
+          navigate(destination, { replace: true });
+        }
 
       } catch (err) {
         console.error('[AuthCallbackSimple] ===== ERROR EN CALLBACK =====');

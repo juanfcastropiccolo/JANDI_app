@@ -56,11 +56,24 @@ export function useAuth() {
             
             if (!alive) return;
             
-            const currentUser = await authService.getCurrentUser();
-            if (alive) {
-              console.log('[useAuth] User loaded:', currentUser?.email);
+            console.log('[useAuth] Calling authService.getCurrentUser()...');
+            const currentUser = await withTimeout(
+              authService.getCurrentUser(),
+              10000,
+              'Timeout al cargar el usuario'
+            );
+            
+            if (!alive) return;
+            
+            if (currentUser) {
+              console.log('[useAuth] ✅ User loaded successfully:', currentUser.email);
               setUser(currentUser);
               setError(null);
+            } else {
+              console.warn('[useAuth] ⚠️ getCurrentUser returned null');
+              // No setear error, solo no hay usuario todavía
+              // Esto puede pasar durante el callback mientras se crea el registro
+              setUser(null);
             }
           } else {
             console.log('[useAuth] No session, clearing user');
@@ -69,13 +82,23 @@ export function useAuth() {
             }
           }
         } catch (err) {
-          console.error('[useAuth] Error handling auth change:', err);
+          console.error('[useAuth] ❌ Error handling auth change:', err);
           if (!alive) return;
           
           // No mostrar error en AbortError
           if (err instanceof Error && err.name !== 'AbortError') {
+            console.error('[useAuth] Error details:', {
+              name: err.name,
+              message: err.message,
+              stack: err.stack
+            });
             setUser(null);
-            setError(err instanceof Error ? err.message : 'Error de autenticación');
+            
+            // Solo mostrar error si no es un timeout durante el callback
+            const isTimeoutError = err.message?.includes('Timeout');
+            if (!isTimeoutError) {
+              setError(err.message || 'Error de autenticación');
+            }
           }
         } finally {
           if (alive) setLoading(false);
