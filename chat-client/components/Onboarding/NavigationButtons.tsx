@@ -57,7 +57,10 @@ export function NavigationButtons({
 
       {/* Next/Finish Button */}
       <button
-        onClick={onNext}
+        onClick={() => {
+          console.log('[NavigationButtons] Button clicked, canProceed:', canProceed, 'loading:', loading);
+          onNext();
+        }}
         disabled={!canProceed || loading}
         className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         style={{

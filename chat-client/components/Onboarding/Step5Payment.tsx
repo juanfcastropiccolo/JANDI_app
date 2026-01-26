@@ -34,6 +34,22 @@ export function Step5Payment({ data, onChange, onValidationChange }: Step5Paymen
   });
   const [mpEmail, setMpEmail] = useState(data?.mercadoPagoEmail || '');
 
+  // Sincronizar estado con data cuando el componente se monta con datos existentes
+  useEffect(() => {
+    if (data) {
+      if (data.method) setMethod(data.method);
+      if (data.cardData) {
+        setCardData({
+          number: data.cardData.number || '',
+          name: data.cardData.name || '',
+          expiry: data.cardData.expiry || '',
+          cvv: data.cardData.cvv || '',
+        });
+      }
+      if (data.mercadoPagoEmail) setMpEmail(data.mercadoPagoEmail);
+    }
+  }, []); // Solo en mount
+
   useEffect(() => {
     let isValid = false;
 
@@ -47,6 +63,18 @@ export function Step5Payment({ data, onChange, onValidationChange }: Step5Paymen
       isValid = !!mpEmail && mpEmail.includes('@');
     }
 
+    console.log('[Step5Payment] Validation:', {
+      method,
+      cardNumber: cardData.number,
+      cardNumberLength: cardData.number?.length,
+      cardName: cardData.name,
+      cardExpiry: cardData.expiry,
+      cardCvv: cardData.cvv,
+      cardCvvLength: cardData.cvv?.length,
+      mpEmail,
+      isValid
+    });
+
     onValidationChange(isValid);
 
     // Update parent
@@ -57,7 +85,7 @@ export function Step5Payment({ data, onChange, onValidationChange }: Step5Paymen
         mercadoPagoEmail: method === 'mercadopago' ? mpEmail : undefined,
       },
     });
-  }, [method, cardData, mpEmail, onValidationChange, onChange]);
+  }, [method, cardData, mpEmail]);
 
   const handleCardChange = (field: keyof CardData, value: string) => {
     let processedValue = value;

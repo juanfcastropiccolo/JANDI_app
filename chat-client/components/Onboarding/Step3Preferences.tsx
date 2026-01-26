@@ -33,7 +33,7 @@ export function Step3Preferences({ data, onChange, onValidationChange }: Step3Pr
   useEffect(() => {
     const isValid = !!formData.priority && !!formData.outOfStockAction;
     onValidationChange(isValid);
-  }, [formData, onValidationChange]);
+  }, [formData]);
 
   const handleChange = (field: keyof PreferencesData, value: any) => {
     const updated = { ...formData, [field]: value };

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -43,16 +43,26 @@ export function OnboardingContainer() {
 
   const [canProceed, setCanProceed] = useState(false);
 
+  // Debug: log cuando cambia canProceed
+  useEffect(() => {
+    console.log('[OnboardingContainer] canProceed changed:', canProceed, 'currentStep:', currentStep);
+  }, [canProceed, currentStep]);
+
   const handleNext = async () => {
+    console.log('[OnboardingContainer] handleNext called, currentStep:', currentStep, 'canProceed:', canProceed);
+    
     if (currentStep === 5) {
       // Último paso: enviar datos
+      console.log('[OnboardingContainer] Submitting onboarding data:', onboardingData);
       try {
         await submitOnboarding();
+        console.log('[OnboardingContainer] Onboarding submitted successfully, navigating to /chat');
         navigate('/chat');
       } catch (err) {
-        console.error('Error submitting onboarding:', err);
+        console.error('[OnboardingContainer] Error submitting onboarding:', err);
       }
     } else {
+      console.log('[OnboardingContainer] Going to next step');
       goToNextStep();
       setCanProceed(false); // Reset para el próximo paso
     }

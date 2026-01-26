@@ -41,7 +41,7 @@ export function Step2Shopping({ data, onChange, onValidationChange }: Step2Shopp
   useEffect(() => {
     const isValid = selectedCategories.length > 0;
     onValidationChange(isValid);
-  }, [selectedCategories, onValidationChange]);
+  }, [selectedCategories]);
 
   const toggleCategory = (categoryId: string) => {
     const updated = selectedCategories.includes(categoryId)

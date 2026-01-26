@@ -59,7 +59,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
     });
 
     onValidationChange(isValid);
-  }, [formData, onValidationChange]);
+  }, [formData]);
 
   const handleChange = (field: string, value: any) => {
     const updated = { ...formData, [field]: value };

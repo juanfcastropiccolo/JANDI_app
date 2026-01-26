@@ -40,7 +40,7 @@ export function Step4Autonomy({ data, onChange, onValidationChange }: Step4Auton
       !!formData.notificationPreference &&
       !!formData.summaryFrequency;
     onValidationChange(isValid);
-  }, [formData, onValidationChange]);
+  }, [formData]);
 
   const handleChange = (field: keyof AutonomyData, value: any) => {
     const updated = { ...formData, [field]: value };
