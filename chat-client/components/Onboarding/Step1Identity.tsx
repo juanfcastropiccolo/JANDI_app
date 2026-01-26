@@ -80,7 +80,7 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-sm mx-auto px-4">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
           Arranquemos por lo básico
@@ -102,7 +102,8 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             value={formData.nickname}
             onChange={(e) => handleChange('nickname', e.target.value)}
             placeholder="¿Cómo querés que te llamemos?"
-            className="w-full pl-10 pr-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="off"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
@@ -120,7 +121,8 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             value={formData.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
             placeholder="+54 9 11 1234-5678"
-            className="w-full pl-10 pr-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="tel"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
@@ -132,14 +134,15 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
           <MapPinIcon className="inline w-5 h-5 mr-1" />
           Dirección principal *
         </label>
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {/* Calle */}
           <input
             type="text"
             value={formData.primaryAddress?.street || ''}
             onChange={(e) => handleAddressChange('street', e.target.value)}
             placeholder="Calle y número"
-            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="off"
+            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -149,7 +152,8 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             value={formData.primaryAddress?.city || ''}
             onChange={(e) => handleAddressChange('city', e.target.value)}
             placeholder="Ciudad"
-            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="off"
+            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -159,7 +163,8 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             value={formData.primaryAddress?.state || ''}
             onChange={(e) => handleAddressChange('state', e.target.value)}
             placeholder="Provincia"
-            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="off"
+            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
           
@@ -169,7 +174,8 @@ export function Step1Identity({ data, onChange, onValidationChange }: Step1Ident
             value={formData.primaryAddress?.zip || ''}
             onChange={(e) => handleAddressChange('zip', e.target.value)}
             placeholder="Código postal"
-            className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+            autoComplete="off"
+            className="w-full px-4 py-2.5 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
           />
         </div>
