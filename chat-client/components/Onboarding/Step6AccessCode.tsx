@@ -75,6 +75,7 @@ export function Step6AccessCode({ data, onChange, onValidationChange }: Step6Acc
   }, [accessCode, onChange, onValidationChange]);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Permitir minúsculas y números, sin forzar mayúsculas
     const value = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 7);
     setAccessCode(value);
   };
@@ -152,11 +153,12 @@ export function Step6AccessCode({ data, onChange, onValidationChange }: Step6Acc
           onChange={handleCodeChange}
           placeholder="Ingresá el código de 7 caracteres"
           maxLength={7}
-          className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all text-center text-lg tracking-widest font-mono uppercase"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all text-center text-lg tracking-widest font-mono"
           style={{
             borderColor: error ? '#ef4444' : 'var(--jandi-gray-light)',
             backgroundColor: 'var(--jandi-white)',
             color: 'var(--jandi-dark-blue)',
+            textTransform: 'none',
           }}
           autoComplete="off"
           autoCapitalize="off"
