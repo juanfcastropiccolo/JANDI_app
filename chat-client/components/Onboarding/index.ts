@@ -20,5 +20,6 @@ export { Step2Shopping } from './Step2Shopping';
 export { Step3Preferences } from './Step3Preferences';
 export { Step4Autonomy } from './Step4Autonomy';
 export { Step5Payment } from './Step5Payment';
+export { Step6AccessCode } from './Step6AccessCode';
 export { StepIndicator } from './StepIndicator';
 export { NavigationButtons } from './NavigationButtons';

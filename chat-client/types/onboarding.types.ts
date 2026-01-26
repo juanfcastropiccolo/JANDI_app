@@ -64,15 +64,20 @@ export interface PaymentData {
   cardData?: CardData;
 }
 
+export interface AccessCodeData {
+  accessCode: string;
+}
+
 export interface OnboardingData {
   step: number;
-  totalSteps: 5;
+  totalSteps: 6;
   data: {
     identity: IdentityData | null;
     shopping: ShoppingData | null;
     preferences: PreferencesData | null;
     autonomy: AutonomyData | null;
     payment: PaymentData | null;
+    accessCode: AccessCodeData | null;
   };
 }
 

@@ -25,11 +25,12 @@ import { Step2Shopping } from './Step2Shopping';
 import { Step3Preferences } from './Step3Preferences';
 import { Step4Autonomy } from './Step4Autonomy';
 import { Step5Payment } from './Step5Payment';
+import { Step6AccessCode } from './Step6AccessCode';
 import { ErrorMessage } from '../Shared/ErrorMessage';
 
 export function OnboardingContainer() {
   const navigate = useNavigate();
-  const { user } = useAuthContext();
+  const { user, refetchUser } = useAuthContext();
   const {
     onboardingData,
     currentStep,
@@ -51,12 +52,18 @@ export function OnboardingContainer() {
   const handleNext = async () => {
     console.log('[OnboardingContainer] handleNext called, currentStep:', currentStep, 'canProceed:', canProceed);
     
-    if (currentStep === 5) {
-      // Último paso: enviar datos
+    if (currentStep === 6) {
+      // Último paso: enviar datos (ahora es el paso 6 con código de acceso)
       console.log('[OnboardingContainer] Submitting onboarding data:', onboardingData);
       try {
         await submitOnboarding();
-        console.log('[OnboardingContainer] Onboarding submitted successfully, navigating to /chat');
+        console.log('[OnboardingContainer] Onboarding submitted successfully');
+        
+        // CRÍTICO: Recargar el usuario para actualizar onboarding_completed
+        console.log('[OnboardingContainer] Recargando usuario para actualizar estado de onboarding...');
+        await refetchUser();
+        console.log('[OnboardingContainer] Usuario recargado, navegando a /chat');
+        
         navigate('/chat');
       } catch (err) {
         console.error('[OnboardingContainer] Error submitting onboarding:', err);
@@ -118,6 +125,14 @@ export function OnboardingContainer() {
             onValidationChange={setCanProceed}
           />
         );
+      case 6:
+        return (
+          <Step6AccessCode
+            data={onboardingData.data.accessCode || { accessCode: '' }}
+            onChange={handleStepDataChange}
+            onValidationChange={setCanProceed}
+          />
+        );
       default:
         return null;
     }
@@ -136,7 +151,7 @@ export function OnboardingContainer() {
         </div>
 
         {/* Step Indicator */}
-        <StepIndicator currentStep={currentStep} totalSteps={5} />
+        <StepIndicator currentStep={currentStep} totalSteps={6} />
 
         {/* Error Message */}
         {error && (
@@ -158,7 +173,7 @@ export function OnboardingContainer() {
           {/* Navigation Buttons */}
           <NavigationButtons
             currentStep={currentStep}
-            totalSteps={5}
+            totalSteps={6}
             onPrevious={handlePrevious}
             onNext={handleNext}
             canProceed={canProceed}

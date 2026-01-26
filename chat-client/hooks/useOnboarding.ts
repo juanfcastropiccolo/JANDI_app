@@ -22,13 +22,14 @@ const STORAGE_KEY = 'jandi_onboarding_data';
 
 const initialOnboardingData: OnboardingData = {
   step: 1,
-  totalSteps: 5,
+  totalSteps: 6,
   data: {
     identity: null,
     shopping: null,
     preferences: null,
     autonomy: null,
     payment: null,
+    accessCode: null,
   },
 };
 

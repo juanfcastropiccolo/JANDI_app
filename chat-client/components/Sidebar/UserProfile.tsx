@@ -131,7 +131,7 @@ function UserProfile({ userEmail, userName, onLogout, onSettings }: UserProfileP
             }}
           >
             <Crown size={18} />
-            <span>Upgrade plan</span>
+            <span>Mejorar plan</span>
           </button>
           <button
             type="button"
@@ -145,7 +145,7 @@ function UserProfile({ userEmail, userName, onLogout, onSettings }: UserProfileP
             }}
           >
             <Palette size={18} />
-            <span>Personalization</span>
+            <span>Personalización</span>
           </button>
           <button
             type="button"
@@ -159,7 +159,7 @@ function UserProfile({ userEmail, userName, onLogout, onSettings }: UserProfileP
             }}
           >
             <Settings size={18} />
-            <span>Settings</span>
+            <span>Configuración</span>
           </button>
           <button
             type="button"
@@ -173,7 +173,7 @@ function UserProfile({ userEmail, userName, onLogout, onSettings }: UserProfileP
             }}
           >
             <HelpCircle size={18} />
-            <span>Help</span>
+            <span>Ayuda</span>
           </button>
           <div
             className="my-1 mx-2"
@@ -193,7 +193,7 @@ function UserProfile({ userEmail, userName, onLogout, onSettings }: UserProfileP
             }}
           >
             <LogOut size={18} />
-            <span>Log out</span>
+            <span>Cerrar sesión</span>
           </button>
         </div>
       )}

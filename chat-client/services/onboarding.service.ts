@@ -19,13 +19,34 @@ import type { OnboardingData, UserProfile } from '../types/onboarding.types';
 
 export class OnboardingService {
   /**
+   * Validar código de acceso (hash SHA-256)
+   */
+  private async validateAccessCode(code: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(code);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    
+    // Hash SHA-256 del código válido
+    const validHash = '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918';
+    return hash === validHash;
+  }
+
+  /**
    * Guardar datos del onboarding en user_profiles
    */
   async saveOnboardingData(userId: string, data: OnboardingData): Promise<UserProfile> {
-    const { identity, shopping, preferences, autonomy, payment } = data.data;
+    const { identity, shopping, preferences, autonomy, payment, accessCode } = data.data;
 
-    if (!identity || !shopping || !preferences || !autonomy || !payment) {
+    if (!identity || !shopping || !preferences || !autonomy || !payment || !accessCode) {
       throw new Error('All onboarding steps must be completed');
+    }
+
+    // Validar código de acceso
+    const isValidCode = await this.validateAccessCode(accessCode.accessCode);
+    if (!isValidCode) {
+      throw new Error('Invalid access code. Please contact JANDI administration.');
     }
 
     // Preparar datos para user_profiles

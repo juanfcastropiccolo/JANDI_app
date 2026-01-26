@@ -192,6 +192,30 @@ export function useAuth() {
     }
   };
 
+  const refetchUser = async () => {
+    try {
+      console.log('[useAuth] refetchUser: Recargando usuario...');
+      setError(null);
+      const currentUser = await withTimeout(
+        authService.getCurrentUser(),
+        5000,
+        'Timeout al recargar usuario'
+      );
+      
+      if (currentUser) {
+        console.log('[useAuth] refetchUser: ✅ Usuario recargado:', currentUser.email, 'onboarding:', currentUser.onboarding_completed);
+        setUser(currentUser);
+      } else {
+        console.warn('[useAuth] refetchUser: ⚠️ No se encontró usuario');
+      }
+    } catch (err) {
+      console.error('[useAuth] refetchUser: ❌ Error recargando usuario:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Error al recargar usuario';
+      setError(errorMessage);
+      throw err;
+    }
+  };
+
   return {
     user,
     loading,
@@ -201,5 +225,6 @@ export function useAuth() {
     loginWithGoogle,
     logout,
     resetPassword,
+    refetchUser,
   };
 }

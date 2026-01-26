@@ -24,6 +24,7 @@ import {appConfig} from './config';
 import {CredentialProviderProxy} from './mocks/credentialProviderProxy';
 import { ConversationProvider, useConversations } from './contexts/ConversationContext';
 import { CartProvider, useCart } from './contexts/CartContext';
+import { useAuthContext } from './contexts/AuthContext';
 import { useSidebar } from './hooks/useSidebar';
 import { useWindowSize } from './hooks/useWindowSize';
 import { CartButton, CartDrawer } from './components/Cart';
@@ -57,12 +58,28 @@ function createChatMessage(
  * Componente interno que usa el ConversationContext
  */
 function AppContent() {
+  const { user, logout } = useAuthContext();
   const [user_email, _setUserEmail] = useState<string | null>('foo@example.com');
   const [isLoading, setIsLoading] = useState(false);
   const credentialProvider = useRef(new CredentialProviderProxy());
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { isOpen, toggle, close } = useSidebar();
   const { isMobile, isDesktop } = useWindowSize();
+
+  // Handler para logout con redirección
+  const handleLogout = async () => {
+    try {
+      console.log('[App] Cerrando sesión...');
+      await logout();
+      console.log('[App] Sesión cerrada, redirigiendo a home...');
+      // Redirección forzada al home
+      window.location.href = '/';
+    } catch (err) {
+      console.error('[App] Error al cerrar sesión:', err);
+      // Intentar redirección de todas formas
+      window.location.href = '/';
+    }
+  };
 
   // Hook del carrito
   const {
@@ -651,8 +668,9 @@ function AppContent() {
         onClose={close}
         onToggle={toggle}
         logoUrl={appConfig.logoUrl}
-        userEmail={user_email || 'usuario@jandi.com'}
-        userName="Usuario"
+        userEmail={user?.email || user_email || 'usuario@jandi.com'}
+        userName={user?.full_name || 'Usuario'}
+        onLogout={handleLogout}
       />
 
       {/* Main Content */}
