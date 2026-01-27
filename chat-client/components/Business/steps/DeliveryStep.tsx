@@ -83,7 +83,7 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-4">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
           Configuración de entregas

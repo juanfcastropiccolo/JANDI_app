@@ -78,11 +78,17 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
     } else {
       setCurrentStep(currentStep + 1);
       setCanProceed(false);
+      
+      // Scroll al inicio del contenedor
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrevious = () => {
     setCurrentStep(currentStep - 1);
+    
+    // Scroll al inicio del contenedor
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleStepDataChange = (stepName: string, data: any) => {
@@ -90,6 +96,59 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
       ...prev,
       [stepName]: data,
     }));
+  };
+
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <BusinessInfoStep
+            data={businessData.basicInfo}
+            onChange={(data) => handleStepDataChange('basicInfo', data)}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 2:
+        return (
+          <LegalInfoStep
+            data={businessData.legalInfo}
+            onChange={(data) => handleStepDataChange('legalInfo', data)}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 3:
+        return (
+          <CatalogStep
+            data={businessData.catalog}
+            onChange={(data) => handleStepDataChange('catalog', data)}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 4:
+        return (
+          <DeliveryStep
+            data={businessData.delivery}
+            onChange={(data) => handleStepDataChange('delivery', data)}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 5:
+        return (
+          <UCPConfigStep
+            businessData={businessData}
+            onValidationChange={setCanProceed}
+          />
+        );
+      case 6:
+        return (
+          <ReviewStep
+            businessData={businessData}
+            onValidationChange={setCanProceed}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   if (success) {
@@ -153,62 +212,15 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
 
         {/* Steps Container */}
         <div className="bg-white rounded-2xl shadow-lg p-8">
-          <div className="overflow-hidden">
-            <div
-              className="flex transition-transform duration-500 ease-in-out"
-              style={{
-                transform: `translateX(-${(currentStep - 1) * 100}%)`,
-                width: '600%',
-              }}
-            >
-              <div className="w-full flex-shrink-0">
-                <BusinessInfoStep
-                  data={businessData.basicInfo}
-                  onChange={(data) => handleStepDataChange('basicInfo', data)}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-
-              <div className="w-full flex-shrink-0">
-                <LegalInfoStep
-                  data={businessData.legalInfo}
-                  onChange={(data) => handleStepDataChange('legalInfo', data)}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-
-              <div className="w-full flex-shrink-0">
-                <CatalogStep
-                  data={businessData.catalog}
-                  onChange={(data) => handleStepDataChange('catalog', data)}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-
-              <div className="w-full flex-shrink-0">
-                <DeliveryStep
-                  data={businessData.delivery}
-                  onChange={(data) => handleStepDataChange('delivery', data)}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-
-              <div className="w-full flex-shrink-0">
-                <UCPConfigStep
-                  businessData={businessData}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-
-              <div className="w-full flex-shrink-0">
-                <ReviewStep
-                  businessData={businessData}
-                  onValidationChange={setCanProceed}
-                />
-              </div>
-            </div>
+          {/* Contenedor del step actual con animación de fade */}
+          <div 
+            key={currentStep}
+            className="animate-fadeIn"
+          >
+            {renderCurrentStep()}
           </div>
-
+          
+          {/* Navigation Buttons */}
           <NavigationButtons
             currentStep={currentStep}
             totalSteps={6}
