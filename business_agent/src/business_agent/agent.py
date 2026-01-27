@@ -48,7 +48,7 @@ from .tools import (
     get_order_status,
 )
 
-from .prompt import get_user_profile, build_jandi_system_prompt
+from .config_loader import BusinessConfig
 
 store = RetailStore()
 mpp = MockPaymentProcessor()
@@ -444,40 +444,57 @@ def modify_output_after_agent(
     return None
 
 
-def create_jandi_agent(user_id: str | None = None):
-    user_id = user_id or os.getenv("JANDI_USER_ID") or os.getenv("USER_ID") or ""
+def create_business_agent(business_id: str, business_config: BusinessConfig):
+    """
+    Crea un agente para un negocio específico.
+    
+    Este agente representa al NEGOCIO, no al usuario.
+    Responde consultas sobre el negocio, valida pedidos según sus políticas,
+    y gestiona órdenes para ese negocio específico.
+    
+    Args:
+        business_id: ID del negocio (requerido)
+        business_config: Configuración del negocio desde DB (requerido)
+    
+    Returns:
+        Agent: Agente configurado para el negocio
+    """
+    from .prompt import build_business_agent_prompt
 
-    profile = get_user_profile(user_id)
+    # Construir prompt específico del negocio
+    BUSINESS_PROMPT = build_business_agent_prompt(business_config)
 
-    JANDI_PROMPT = build_jandi_system_prompt(profile)
+    # Nombre y descripción del agente del negocio
+    agent_name = f"business_agent_{business_id}"
+    agent_description = f"{business_config.business_name} - {business_config.identity.get('category', 'negocio')}"
 
-    root_agent = Agent(
-        name="jandi_business_agent",
+    business_agent = Agent(
+        name=agent_name,
         model="gemini-2.0-flash-exp",
-        description="JANDI - Asistente inteligente de compras con acceso a múltiples negocios",
-        instruction=JANDI_PROMPT,
+        description=agent_description,
+        instruction=BUSINESS_PROMPT,
         tools=[
-            # Herramientas originales de UCP (mantener compatibilidad)
-            search_shopping_catalog,
-            add_to_checkout,
-            remove_from_checkout,
-            update_checkout,
-            get_checkout,
-            start_payment,
-            update_customer_details,
-            complete_checkout,
-            # Nuevas herramientas con Supabase (adicionales)
-            get_business_catalog,
-            search_products_across_businesses,
-            create_checkout_session_supabase,
-            complete_checkout_order,
-            get_user_preferences,
-            get_order_status,
+            # Herramientas específicas del negocio
+            search_shopping_catalog,  # Buscar en el catálogo de ESTE negocio
+            get_business_catalog,      # Obtener catálogo completo
+            add_to_checkout,           # Agregar al carrito
+            remove_from_checkout,      # Remover del carrito
+            update_checkout,           # Actualizar carrito
+            get_checkout,              # Ver carrito
+            start_payment,             # Iniciar pago
+            update_customer_details,   # Actualizar datos del cliente
+            complete_checkout,         # Completar compra
+            create_checkout_session_supabase,  # Crear sesión
+            complete_checkout_order,   # Completar orden
+            get_order_status,          # Estado de orden
         ],
         after_tool_callback=after_tool_modifier,
         after_agent_callback=modify_output_after_agent,
     )
 
-    return root_agent
+    return business_agent
 
-root_agent = create_jandi_agent()
+
+# Para compatibilidad con código existente, crear un agente por defecto
+# NOTA: En producción, esto NO debería usarse. Cada negocio debe tener su propio agente.
+root_agent = None  # Se inicializará en main.py con business_id específico

@@ -139,33 +139,48 @@ export function CatalogStep({ data, onChange, onValidationChange }: CatalogStepP
               style={{ borderColor: 'var(--jandi-gray-light)' }}
             />
             <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                value={newProduct.price}
-                onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
-                placeholder="Precio *"
-                min="0"
-                step="0.01"
-                className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
-                style={{ borderColor: 'var(--jandi-gray-light)' }}
-              />
-              <input
-                type="text"
-                value={newProduct.category}
-                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                placeholder="Categoría"
-                className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
-                style={{ borderColor: 'var(--jandi-gray-light)' }}
-              />
-              <input
-                type="number"
-                value={newProduct.stock}
-                onChange={(e) => setNewProduct({ ...newProduct, stock: Number(e.target.value) })}
-                placeholder="Stock"
-                min="0"
-                className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
-                style={{ borderColor: 'var(--jandi-gray-light)' }}
-              />
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
+                  Precio *
+                </label>
+                <input
+                  type="number"
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                  className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+                  style={{ borderColor: 'var(--jandi-gray-light)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
+                  Categoría
+                </label>
+                <input
+                  type="text"
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                  placeholder="Ej: Snacks"
+                  className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+                  style={{ borderColor: 'var(--jandi-gray-light)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--jandi-dark-blue)' }}>
+                  Stock inicial
+                </label>
+                <input
+                  type="number"
+                  value={newProduct.stock}
+                  onChange={(e) => setNewProduct({ ...newProduct, stock: Number(e.target.value) })}
+                  placeholder="0"
+                  min="0"
+                  className="w-full px-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
+                  style={{ borderColor: 'var(--jandi-gray-light)' }}
+                />
+              </div>
             </div>
             <div className="flex gap-3">
               <button

@@ -26,6 +26,7 @@ import { DeliveryStep } from './steps/DeliveryStep';
 import { UCPConfigStep } from './steps/UCPConfigStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { businessService } from '../../services/business.service';
+import { businessConfigService } from '../../services/business-config.service';
 import { ErrorMessage } from '../Shared/ErrorMessage';
 import { SuccessMessage } from '../Shared/SuccessMessage';
 
@@ -63,11 +64,19 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
       try {
         setLoading(true);
         setError(null);
-        await businessService.createBusiness({
+        
+        // Crear el negocio primero
+        const business = await businessService.createBusiness({
           ...businessData.basicInfo,
           ...businessData.legalInfo,
           ...businessData.delivery,
         });
+        
+        // Guardar la configuración completa del agente
+        if (businessData.ucpConfig) {
+          await businessConfigService.saveConfiguration(business.id, businessData.ucpConfig);
+        }
+        
         setSuccess(true);
       } catch (err) {
         console.error('Error creating business:', err);
@@ -136,6 +145,8 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
         return (
           <UCPConfigStep
             businessData={businessData}
+            data={businessData.ucpConfig}
+            onChange={(data) => handleStepDataChange('ucpConfig', data)}
             onValidationChange={setCanProceed}
           />
         );
