@@ -20,7 +20,6 @@ import { motion } from 'framer-motion';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { StepProgress } from './StepProgress';
 import { NavigationButtons } from '../Onboarding/NavigationButtons';
-import { BusinessAuthStep } from './steps/BusinessAuthStep';
 import { BusinessInfoStep } from './steps/BusinessInfoStep';
 import { LegalInfoStep } from './steps/LegalInfoStep';
 import { CatalogStep } from './steps/CatalogStep';
@@ -30,15 +29,15 @@ import { ReviewStep } from './steps/ReviewStep';
 import { businessService } from '../../services/business.service';
 import { businessConfigService } from '../../services/business-config.service';
 import { authService } from '../../services/auth.service';
+import { useAuth } from '../../hooks/useAuth';
 import { ErrorMessage } from '../Shared/ErrorMessage';
 import { SuccessMessage } from '../Shared/SuccessMessage';
 
 interface BusinessRegisterProps {
-  onNavigateBack: () => void;
+  onComplete?: (businessId: string) => void;
 }
 
 const STEP_LABELS = [
-  'Crear Cuenta',
   'Info Básica',
   'Documentación',
   'Catálogo',
@@ -47,8 +46,9 @@ const STEP_LABELS = [
   'Revisión',
 ];
 
-export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
+export function BusinessRegister({ onComplete }: BusinessRegisterProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [canProceed, setCanProceed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -57,7 +57,6 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
   const [createdBusinessId, setCreatedBusinessId] = useState<string | null>(null);
 
   const [businessData, setBusinessData] = useState<any>({
-    auth: null,
     basicInfo: null,
     legalInfo: null,
     catalog: null,
@@ -66,17 +65,15 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
   });
 
   const handleNext = async () => {
-    if (currentStep === 7) {
+    if (currentStep === 6) {
       // Submit final
       try {
         setLoading(true);
         setError(null);
         
         // Verificar que el usuario esté autenticado
-        const user = await authService.getCurrentUser();
-        
         if (!user) {
-          setError('Sesión expirada. Por favor, vuelve a iniciar el proceso.');
+          setError('Sesión expirada. Por favor, vuelve a iniciar sesión.');
           setLoading(false);
           return;
         }
@@ -142,10 +139,16 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
         setCreatedBusinessId(business.id);
         setSuccess(true);
         
-        // Redirigir al dashboard después de 2 segundos
-        setTimeout(() => {
-          navigate(`/business/dashboard/${business.id}`);
-        }, 2000);
+        // Llamar callback o redirigir
+        if (onComplete) {
+          setTimeout(() => {
+            onComplete(business.id);
+          }, 2000);
+        } else {
+          setTimeout(() => {
+            navigate(`/business/dashboard/${business.id}`);
+          }, 2000);
+        }
       } catch (err: any) {
         console.error('Error creating business:', err);
         const errorMessage = err?.message || 'Error al registrar el negocio. Por favor intenta nuevamente.';
@@ -180,22 +183,14 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
     switch (currentStep) {
       case 1:
         return (
-          <BusinessAuthStep
-            data={businessData.auth}
-            onChange={(data) => handleStepDataChange('auth', data)}
-            onValidationChange={setCanProceed}
-          />
-        );
-      case 2:
-        return (
           <BusinessInfoStep
             data={businessData.basicInfo}
             onChange={(data) => handleStepDataChange('basicInfo', data)}
             onValidationChange={setCanProceed}
-            userEmail={businessData.auth?.email}
+            userEmail={user?.email}
           />
         );
-      case 3:
+      case 2:
         return (
           <LegalInfoStep
             data={businessData.legalInfo}
@@ -203,7 +198,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 4:
+      case 3:
         return (
           <CatalogStep
             data={businessData.catalog}
@@ -211,7 +206,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 5:
+      case 4:
         return (
           <DeliveryStep
             data={businessData.delivery}
@@ -219,7 +214,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 6:
+      case 5:
         return (
           <UCPConfigStep
             businessData={businessData}
@@ -228,7 +223,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 7:
+      case 6:
         return (
           <ReviewStep
             businessData={businessData}
@@ -269,23 +264,14 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
     <div className="min-h-screen" style={{ backgroundColor: 'var(--jandi-background)' }}>
       {/* Header */}
       <header className="py-4 px-6 bg-white shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <button
-            onClick={onNavigateBack}
-            className="flex items-center gap-2 text-sm font-medium hover:underline"
-            style={{ color: 'var(--jandi-dark-blue)' }}
-          >
-            <ArrowLeftIcon className="w-4 h-4" />
-            Volver
-          </button>
+        <div className="max-w-5xl mx-auto flex items-center justify-center">
           <img src="/images/JANDI_LOGO_COMPLETO.png" alt="JANDI" className="h-8" />
-          <div className="w-20" /> {/* Spacer for centering */}
         </div>
       </header>
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <StepProgress currentStep={currentStep} totalSteps={7} stepLabels={STEP_LABELS} />
+        <StepProgress currentStep={currentStep} totalSteps={6} stepLabels={STEP_LABELS} />
 
         {error && (
           <div className="mb-6">
@@ -306,7 +292,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
           {/* Navigation Buttons */}
           <NavigationButtons
             currentStep={currentStep}
-            totalSteps={7}
+            totalSteps={6}
             onPrevious={handlePrevious}
             onNext={handleNext}
             canProceed={canProceed}

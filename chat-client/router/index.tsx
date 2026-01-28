@@ -26,6 +26,10 @@ import { AuthCallbackSimple } from '../components/Auth/AuthCallbackSimple';
 import { OnboardingContainer } from '../components/Onboarding/OnboardingContainer';
 import { BusinessLanding } from '../components/Business/BusinessLanding';
 import { BusinessRegister } from '../components/Business/BusinessRegister';
+import { BusinessRegisterForm } from '../components/Business/Auth/BusinessRegisterForm';
+import { BusinessLoginForm } from '../components/Business/Auth/BusinessLoginForm';
+import { BusinessAuthCallback } from '../components/Business/Auth/BusinessAuthCallback';
+import { BusinessOnboardingGuard } from './BusinessOnboardingGuard';
 import { BusinessDashboard } from '../components/Business/Dashboard/BusinessDashboard';
 import { ProductsManagement } from '../components/Business/Dashboard/ProductsManagement';
 import { OrdersManagement } from '../components/Business/Dashboard/OrdersManagement';
@@ -87,17 +91,64 @@ function BusinessLandingRoute() {
   return (
     <BusinessLanding
       onNavigateToRegister={() => navigate('/business/register')}
+      onNavigateToLogin={() => navigate('/business/login')}
       onNavigateToHome={() => navigate('/')}
     />
   );
 }
 
+// Wrapper para register form
 function BusinessRegisterRoute() {
+  const navigate = useNavigate();
+  const [showSuccess, setShowSuccess] = React.useState(false);
+  
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--jandi-background)' }}>
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: 'var(--jandi-light-blue)' }}>
+            <span className="text-4xl">✉️</span>
+          </div>
+          <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--jandi-dark-blue)' }}>
+            ¡Revisa tu email!
+          </h2>
+          <p className="mb-6" style={{ color: 'var(--jandi-gray)' }}>
+            Te enviamos un email de confirmación. Por favor revisa tu bandeja de entrada y haz click en el link para activar tu cuenta.
+          </p>
+          <button
+            onClick={() => navigate('/business/login')}
+            className="px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 hover:scale-105"
+            style={{ backgroundColor: 'var(--jandi-light-blue)' }}
+          >
+            Ir al Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <BusinessRegisterForm
+      onNavigateToLogin={() => navigate('/business/login')}
+      onRegisterSuccess={() => setShowSuccess(true)}
+    />
+  );
+}
+
+// Wrapper para login form
+function BusinessLoginRoute() {
   const navigate = useNavigate();
   
   return (
-    <BusinessRegister
-      onNavigateBack={() => navigate('/business')}
+    <BusinessLoginForm
+      onNavigateToRegister={() => navigate('/business/register')}
+      onLoginSuccess={(businessId) => {
+        if (businessId) {
+          navigate(`/business/dashboard/${businessId}`, { replace: true });
+        } else {
+          navigate('/business/onboarding', { replace: true });
+        }
+      }}
     />
   );
 }
@@ -148,6 +199,26 @@ export const router = createBrowserRouter([
   {
     path: '/business/register',
     element: <BusinessRegisterRoute />,
+  },
+  {
+    path: '/business/login',
+    element: <BusinessLoginRoute />,
+  },
+  {
+    path: '/business/auth/callback',
+    element: <BusinessAuthCallback />,
+  },
+  {
+    path: '/business/onboarding',
+    element: (
+      <BusinessOnboardingGuard>
+        <BusinessRegister 
+          onComplete={(businessId) => {
+            window.location.href = `/business/dashboard/${businessId}`;
+          }}
+        />
+      </BusinessOnboardingGuard>
+    ),
   },
   {
     path: '/business/dashboard/:businessId',

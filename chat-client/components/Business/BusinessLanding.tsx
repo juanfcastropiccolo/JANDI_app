@@ -26,10 +26,11 @@ import {
 
 interface BusinessLandingProps {
   onNavigateToRegister: () => void;
+  onNavigateToLogin: () => void;
   onNavigateToHome: () => void;
 }
 
-export function BusinessLanding({ onNavigateToRegister, onNavigateToHome }: BusinessLandingProps) {
+export function BusinessLanding({ onNavigateToRegister, onNavigateToLogin, onNavigateToHome }: BusinessLandingProps) {
   const benefits = [
     {
       icon: ShoppingBagIcon,
@@ -66,12 +67,20 @@ export function BusinessLanding({ onNavigateToRegister, onNavigateToHome }: Busi
       <header className="py-4 px-6" style={{ backgroundColor: 'var(--jandi-dark-blue)' }}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <img src="/images/JANDI_LOGO_COMPLETO.png" alt="JANDI" className="h-10" />
-          <button
-            onClick={onNavigateToHome}
-            className="text-white hover:underline text-sm"
-          >
-            Volver al inicio
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onNavigateToLogin}
+              className="text-white hover:underline text-sm font-medium"
+            >
+              Ya tengo cuenta
+            </button>
+            <button
+              onClick={onNavigateToHome}
+              className="text-white hover:underline text-sm"
+            >
+              Volver al inicio
+            </button>
+          </div>
         </div>
       </header>
 
