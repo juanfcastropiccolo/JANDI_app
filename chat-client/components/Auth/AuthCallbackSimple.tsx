@@ -51,40 +51,61 @@ export function AuthCallbackSimple() {
           throw new Error(msg);
         }
 
+        // 2. Verificar si hay código de autorización en la URL
+        const code = url.searchParams.get('code');
+        console.log('[AuthCallbackSimple] Code in URL:', code ? 'YES' : 'NO');
+
         if (!alive) return;
-        setMessage('Verificando sesión...');
-
-        // 2. Esperar un momento para que Supabase termine de procesar la sesión
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // 3. Verificar que tenemos sesión (Supabase ya hizo el exchangeCodeForSession)
-        console.log('[AuthCallbackSimple] Verificando sesión...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          console.error('[AuthCallbackSimple] Error getSession:', sessionError);
-          throw sessionError;
-        }
-
-        if (!session || !session.user) {
-          console.log('[AuthCallbackSimple] No hay sesión todavía, esperando...');
-          // Esperar un poco más y reintentar
-          await new Promise(resolve => setTimeout(resolve, 1500));
+        if (code) {
+          // Si hay código, intercambiarlo por sesión
+          setMessage('Intercambiando código de autenticación...');
+          console.log('[AuthCallbackSimple] Exchanging code for session...');
           
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          if (!retrySession || !retrySession.user) {
-            console.error('[AuthCallbackSimple] No se pudo establecer la sesión');
-            throw new Error('No se pudo establecer la sesión. Intentá nuevamente.');
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          
+          if (exchangeError) {
+            console.error('[AuthCallbackSimple] Error exchanging code:', exchangeError);
+            throw exchangeError;
           }
           
-          console.log('[AuthCallbackSimple] ✅ Sesión verificada (retry):', retrySession.user.email);
-          return handleUserProfile(retrySession.user, alive, setMessage, navigate);
+          if (!data.session || !data.session.user) {
+            throw new Error('No se pudo obtener la sesión después del intercambio');
+          }
+          
+          console.log('[AuthCallbackSimple] ✅ Code exchanged successfully:', data.session.user.email);
+          
+          // Limpiar la URL
+          window.history.replaceState({}, document.title, url.pathname);
+          
+          if (!alive) return;
+          
+          // Procesar perfil del usuario
+          await handleUserProfile(data.session.user, alive, setMessage, navigate);
+        } else {
+          // No hay código, verificar si ya hay sesión
+          setMessage('Verificando sesión...');
+          console.log('[AuthCallbackSimple] No code, checking existing session...');
+          
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('[AuthCallbackSimple] Error getSession:', sessionError);
+            throw sessionError;
+          }
+
+          if (!session || !session.user) {
+            console.error('[AuthCallbackSimple] No session and no code');
+            throw new Error('No se encontró código de autenticación ni sesión activa');
+          }
+
+          console.log('[AuthCallbackSimple] ✅ Existing session found:', session.user.email);
+
+          if (!alive) return;
+          
+          // Procesar perfil del usuario
+          await handleUserProfile(session.user, alive, setMessage, navigate);
         }
-
-        console.log('[AuthCallbackSimple] ✅ Sesión verificada:', session.user.email);
-
-        // 4. Procesar perfil del usuario
-        await handleUserProfile(session.user, alive, setMessage, navigate);
 
       } catch (err) {
         console.error('[AuthCallbackSimple] ===== ERROR EN CALLBACK =====', err);
