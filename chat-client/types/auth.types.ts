@@ -14,9 +14,20 @@
  * limitations under the License.
  */
 
-export interface User {
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+/**
+ * User type que extiende el Auth User de Supabase con propiedades custom
+ * de nuestra tabla users. Esto permite tener un objeto completo con:
+ * - Propiedades de autenticación (de Supabase Auth)
+ * - Propiedades de negocio (de tabla users)
+ */
+export interface User extends Partial<SupabaseUser> {
+  // Propiedades requeridas
   id: string;
   email: string;
+  
+  // Propiedades de la tabla users
   full_name?: string;
   phone?: string;
   avatar_url?: string;

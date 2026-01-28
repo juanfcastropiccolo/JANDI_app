@@ -59,10 +59,17 @@ export function OnboardingContainer() {
         await submitOnboarding();
         console.log('[OnboardingContainer] Onboarding submitted successfully');
         
+        // Esperar un momento para asegurar que la base de datos se actualizó
+        console.log('[OnboardingContainer] Esperando replicación de base de datos...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // CRÍTICO: Recargar el usuario para actualizar onboarding_completed
         console.log('[OnboardingContainer] Recargando usuario para actualizar estado de onboarding...');
         await refetchUser();
         console.log('[OnboardingContainer] Usuario recargado, navegando a /chat');
+        
+        // Pequeño delay adicional antes de navegar
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         navigate('/chat');
       } catch (err) {

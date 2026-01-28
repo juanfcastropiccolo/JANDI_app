@@ -16,7 +16,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import type { User } from '@supabase/supabase-js';
+import { authService } from '../services/auth.service';
+import type { User } from '../types/auth.types';
 import type { LoginCredentials, RegisterCredentials } from '../types/auth.types';
 
 export function useAuth() {
@@ -25,16 +26,38 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Obtener sesión actual
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    console.log('[useAuth] Initializing auth hook...');
+    
+    // Obtener usuario completo al iniciar
+    authService.getFullUser().then(fullUser => {
+      console.log('[useAuth] Initial user loaded:', fullUser?.email, 'onboarding:', fullUser?.onboarding_completed);
+      setUser(fullUser);
+      setLoading(false);
+    }).catch(err => {
+      console.error('[useAuth] Error loading initial user:', err);
+      setUser(null);
       setLoading(false);
     });
 
     // Escuchar cambios en auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
+      async (_event, session) => {
+        console.log('[useAuth] Auth state changed, event:', _event, 'has session:', !!session);
+        
+        if (session?.user) {
+          // Obtener usuario completo cuando hay sesión
+          try {
+            const fullUser = await authService.getFullUser();
+            console.log('[useAuth] Full user loaded after auth change:', fullUser?.email, 'onboarding:', fullUser?.onboarding_completed);
+            setUser(fullUser);
+          } catch (err) {
+            console.error('[useAuth] Error loading full user after auth change:', err);
+            setUser(null);
+          }
+        } else {
+          console.log('[useAuth] No session, clearing user');
+          setUser(null);
+        }
         setLoading(false);
       }
     );
@@ -149,10 +172,12 @@ export function useAuth() {
 
   const refetchUser = async () => {
     try {
-      const { data: { user: refreshedUser } } = await supabase.auth.getUser();
-      setUser(refreshedUser);
+      console.log('[useAuth] Refetching user...');
+      const fullUser = await authService.getFullUser();
+      console.log('[useAuth] User refetched:', fullUser?.email, 'onboarding:', fullUser?.onboarding_completed);
+      setUser(fullUser);
     } catch (err) {
-      console.error('Error refreshing user:', err);
+      console.error('[useAuth] Error refreshing user:', err);
     }
   };
 
