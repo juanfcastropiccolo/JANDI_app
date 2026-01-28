@@ -30,34 +30,80 @@ export function BusinessAuthCallback() {
       try {
         console.log('🔍 Procesando callback de confirmación de email...');
 
-        // Supabase maneja el token automáticamente
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Obtener el hash de la URL que contiene el token
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
 
-        if (error) throw error;
+        console.log('🔍 Token type:', type);
+        console.log('🔍 Access token presente:', !!accessToken);
 
-        if (session) {
-          console.log('✅ Sesión obtenida:', session.user.email);
-
-          // Verificar que sea un usuario de negocio
-          const userType = session.user.user_metadata?.user_type;
+        // Si es un signup confirmation, establecer la sesión
+        if (type === 'signup' && accessToken && refreshToken) {
+          console.log('🔍 Estableciendo sesión con tokens...');
           
-          if (userType !== 'business') {
-            console.error('❌ Usuario no es de tipo negocio:', userType);
-            throw new Error('Esta cuenta no es de tipo negocio');
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) throw error;
+
+          if (data.session) {
+            console.log('✅ Sesión establecida:', data.session.user.email);
+
+            // Verificar que sea un usuario de negocio
+            const userType = data.session.user.user_metadata?.user_type;
+            
+            if (userType !== 'business') {
+              console.error('❌ Usuario no es de tipo negocio:', userType);
+              throw new Error('Esta cuenta no es de tipo negocio');
+            }
+
+            console.log('✅ Usuario de negocio confirmado');
+            setStatus('success');
+            
+            // Redirigir al login después de 2 segundos
+            setTimeout(() => {
+              navigate('/business/login', { 
+                state: { emailConfirmed: true },
+                replace: true
+              });
+            }, 2000);
+          } else {
+            throw new Error('No se pudo establecer la sesión');
           }
-
-          console.log('✅ Usuario de negocio confirmado');
-          setStatus('success');
-          
-          // Redirigir al login después de 2 segundos
-          setTimeout(() => {
-            navigate('/business/login', { 
-              state: { emailConfirmed: true },
-              replace: true
-            });
-          }, 2000);
         } else {
-          throw new Error('No se pudo confirmar la sesión');
+          // Intentar obtener sesión existente
+          const { data: { session }, error } = await supabase.auth.getSession();
+
+          if (error) throw error;
+
+          if (session) {
+            console.log('✅ Sesión obtenida:', session.user.email);
+
+            // Verificar que sea un usuario de negocio
+            const userType = session.user.user_metadata?.user_type;
+            
+            if (userType !== 'business') {
+              console.error('❌ Usuario no es de tipo negocio:', userType);
+              throw new Error('Esta cuenta no es de tipo negocio');
+            }
+
+            console.log('✅ Usuario de negocio confirmado');
+            setStatus('success');
+            
+            // Redirigir al login después de 2 segundos
+            setTimeout(() => {
+              navigate('/business/login', { 
+                state: { emailConfirmed: true },
+                replace: true
+              });
+            }, 2000);
+          } else {
+            throw new Error('No se pudo confirmar la sesión. Por favor intenta iniciar sesión.');
+          }
         }
       } catch (err: any) {
         console.error('Error en callback:', err);
@@ -123,13 +169,22 @@ export function BusinessAuthCallback() {
         <p className="mb-6" style={{ color: 'var(--jandi-gray)' }}>
           {errorMessage}
         </p>
-        <button
-          onClick={() => navigate('/business/register')}
-          className="px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 hover:scale-105"
-          style={{ backgroundColor: 'var(--jandi-light-blue)' }}
-        >
-          Volver al registro
-        </button>
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={() => navigate('/business/login')}
+            className="px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 hover:scale-105"
+            style={{ backgroundColor: 'var(--jandi-light-blue)' }}
+          >
+            Ir al Login
+          </button>
+          <button
+            onClick={() => navigate('/business/register')}
+            className="px-6 py-3 rounded-lg font-medium border-2 transition-all duration-200 hover:scale-105"
+            style={{ borderColor: 'var(--jandi-light-blue)', color: 'var(--jandi-light-blue)' }}
+          >
+            Volver al registro
+          </button>
+        </div>
       </motion.div>
     </div>
   );

@@ -64,6 +64,11 @@ export function BusinessRegister({ onComplete }: BusinessRegisterProps) {
     ucpConfig: null,
   });
 
+  // Log del usuario para debugging
+  React.useEffect(() => {
+    console.log('👤 Usuario en BusinessRegister:', user?.email);
+  }, [user]);
+
   const handleNext = async () => {
     if (currentStep === 6) {
       // Submit final

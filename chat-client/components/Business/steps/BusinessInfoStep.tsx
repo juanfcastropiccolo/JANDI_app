@@ -67,6 +67,14 @@ export function BusinessInfoStep({ data, onChange, onValidationChange, userEmail
     }
   );
 
+  // Actualizar email cuando userEmail cambie
+  useEffect(() => {
+    if (userEmail && formData.email !== userEmail) {
+      console.log('📧 Actualizando email del usuario:', userEmail);
+      setFormData(prev => ({ ...prev, email: userEmail }));
+    }
+  }, [userEmail]);
+
   useEffect(() => {
     const isValid =
       !!formData.businessName &&
