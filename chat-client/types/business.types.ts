@@ -41,6 +41,34 @@ export interface Business {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown>;
+  // Campos de configuración del agente
+  operating_regions: string[];
+  delivery_methods: {
+    delivery: boolean;
+    pickup: boolean;
+  };
+  delivery_zones: string[];
+  estimated_delivery_time_min?: number;
+  estimated_delivery_time_max?: number;
+  pickup_preparation_time_minutes?: number;
+  payment_methods_supported: {
+    cash: boolean;
+    card: boolean;
+    wallet: {
+      mercadoPago: boolean;
+    };
+  };
+  payment_timing?: string;
+  return_policy?: string;
+  refund_policy?: string;
+  cancellation_window_minutes?: number;
+  business_contact_email?: string;
+  business_contact_phone?: string;
+  responsible_person_name?: string;
+  catalog_source_type: string;
+  price_currency: string;
+  agent_card: Record<string, unknown>;
+  business_config: Record<string, unknown>;
 }
 
 export interface BusinessHours {

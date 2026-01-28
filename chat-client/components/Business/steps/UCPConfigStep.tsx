@@ -59,7 +59,7 @@ export function UCPConfigStep({ businessData, onValidationChange, data, onChange
         operatingRegions: [],
       },
       operations: {
-        openingHours: businessData?.delivery?.businessHours || DAYS.reduce((acc, day) => ({
+        openingHours: businessData?.delivery?.business_hours || DAYS.reduce((acc, day) => ({
           ...acc,
           [day]: { open: '09:00', close: '18:00', closed: false },
         }), {} as WeekSchedule),

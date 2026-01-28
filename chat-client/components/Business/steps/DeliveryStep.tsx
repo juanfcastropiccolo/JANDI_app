@@ -18,11 +18,11 @@ import React, { useEffect, useState } from 'react';
 import { ClockIcon } from '@heroicons/react/24/outline';
 
 interface DeliveryData {
-  deliveryRadiusKm: number;
-  deliveryFee: number;
-  minOrderAmount: number;
+  delivery_radius_km: number;
+  delivery_fee: number;
+  min_order_amount: number;
   preparationTime: number;
-  businessHours: {
+  business_hours: {
     [key: string]: { open: string; close: string; closed: boolean };
   };
 }
@@ -47,11 +47,11 @@ const DAY_LABELS: { [key: string]: string } = {
 export function DeliveryStep({ data, onChange, onValidationChange }: DeliveryStepProps) {
   const [formData, setFormData] = useState<DeliveryData>(
     data || {
-      deliveryRadiusKm: 5,
-      deliveryFee: 500,
-      minOrderAmount: 1000,
+      delivery_radius_km: 5,
+      delivery_fee: 500,
+      min_order_amount: 1000,
       preparationTime: 30,
-      businessHours: DAYS.reduce((acc, day) => ({
+      business_hours: DAYS.reduce((acc, day) => ({
         ...acc,
         [day]: { open: '09:00', close: '18:00', closed: false },
       }), {}),
@@ -60,9 +60,9 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
 
   useEffect(() => {
     const isValid =
-      formData.deliveryRadiusKm > 0 &&
-      formData.deliveryFee >= 0 &&
-      formData.minOrderAmount >= 0;
+      formData.delivery_radius_km > 0 &&
+      formData.delivery_fee >= 0 &&
+      formData.min_order_amount >= 0;
 
     onValidationChange(isValid);
     onChange(formData);
@@ -75,9 +75,9 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
   const handleHoursChange = (day: string, field: string, value: any) => {
     setFormData({
       ...formData,
-      businessHours: {
-        ...formData.businessHours,
-        [day]: { ...formData.businessHours[day], [field]: value },
+      business_hours: {
+        ...formData.business_hours,
+        [day]: { ...formData.business_hours[day], [field]: value },
       },
     });
   };
@@ -103,15 +103,15 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
             type="range"
             min="1"
             max="50"
-            value={formData.deliveryRadiusKm}
-            onChange={(e) => handleChange('deliveryRadiusKm', Number(e.target.value))}
+            value={formData.delivery_radius_km}
+            onChange={(e) => handleChange('delivery_radius_km', Number(e.target.value))}
             className="flex-1"
             style={{ accentColor: 'var(--jandi-light-blue)' }}
           />
           <input
             type="number"
-            value={formData.deliveryRadiusKm}
-            onChange={(e) => handleChange('deliveryRadiusKm', Number(e.target.value))}
+            value={formData.delivery_radius_km}
+            onChange={(e) => handleChange('delivery_radius_km', Number(e.target.value))}
             className="w-20 px-3 py-2 rounded-lg border-2 text-center font-bold"
             style={{ borderColor: 'var(--jandi-light-blue)', color: 'var(--jandi-dark-blue)' }}
           />
@@ -130,8 +130,8 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
           </span>
           <input
             type="number"
-            value={formData.deliveryFee}
-            onChange={(e) => handleChange('deliveryFee', Number(e.target.value))}
+            value={formData.delivery_fee}
+            onChange={(e) => handleChange('delivery_fee', Number(e.target.value))}
             placeholder="0"
             min="0"
             step="50"
@@ -155,8 +155,8 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
           </span>
           <input
             type="number"
-            value={formData.minOrderAmount}
-            onChange={(e) => handleChange('minOrderAmount', Number(e.target.value))}
+            value={formData.min_order_amount}
+            onChange={(e) => handleChange('min_order_amount', Number(e.target.value))}
             placeholder="0"
             min="0"
             step="100"
@@ -194,7 +194,7 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
             <div key={day} className="flex items-center gap-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--jandi-background)' }}>
               <input
                 type="checkbox"
-                checked={!formData.businessHours[day].closed}
+                checked={!formData.business_hours[day].closed}
                 onChange={(e) => handleHoursChange(day, 'closed', !e.target.checked)}
                 className="w-4 h-4"
                 style={{ accentColor: 'var(--jandi-light-blue)' }}
@@ -202,11 +202,11 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
               <span className="w-24 text-sm font-medium" style={{ color: 'var(--jandi-dark-blue)' }}>
                 {DAY_LABELS[day]}
               </span>
-              {!formData.businessHours[day].closed ? (
+              {!formData.business_hours[day].closed ? (
                 <div className="flex items-center gap-2 flex-1">
                   <input
                     type="time"
-                    value={formData.businessHours[day].open}
+                    value={formData.business_hours[day].open}
                     onChange={(e) => handleHoursChange(day, 'open', e.target.value)}
                     className="px-3 py-1 rounded border text-sm"
                     style={{ borderColor: 'var(--jandi-gray-light)' }}
@@ -214,7 +214,7 @@ export function DeliveryStep({ data, onChange, onValidationChange }: DeliverySte
                   <span style={{ color: 'var(--jandi-gray)' }}>-</span>
                   <input
                     type="time"
-                    value={formData.businessHours[day].close}
+                    value={formData.business_hours[day].close}
                     onChange={(e) => handleHoursChange(day, 'close', e.target.value)}
                     className="px-3 py-1 rounded border text-sm"
                     style={{ borderColor: 'var(--jandi-gray-light)' }}
