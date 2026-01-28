@@ -65,11 +65,47 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
         setLoading(true);
         setError(null);
         
-        // Crear el negocio primero
+        // Crear el negocio primero - mapear correctamente los campos
         const business = await businessService.createBusiness({
-          ...businessData.basicInfo,
-          ...businessData.legalInfo,
-          ...businessData.delivery,
+          // Campos básicos
+          businessName: businessData.basicInfo?.businessName,
+          legalName: businessData.basicInfo?.legalName,
+          businessType: businessData.basicInfo?.businessType,
+          email: businessData.basicInfo?.email,
+          phone: businessData.basicInfo?.phone,
+          address: businessData.basicInfo?.address,
+          description: businessData.basicInfo?.description,
+          
+          // Campos legales
+          taxId: businessData.legalInfo?.taxId,
+          legalEntityType: businessData.legalInfo?.legalEntityType,
+          
+          // Campos de delivery
+          delivery_radius_km: businessData.delivery?.deliveryRadiusKm,
+          delivery_fee: businessData.delivery?.deliveryFee,
+          min_order_amount: businessData.delivery?.minOrderAmount,
+          
+          // Campos de configuración UCP (si existen)
+          operating_regions: businessData.ucpConfig?.identity?.operatingRegions || [],
+          delivery_methods: businessData.ucpConfig?.operations?.deliveryMethods || { delivery: true, pickup: false },
+          delivery_zones: businessData.ucpConfig?.operations?.deliveryZones || [],
+          estimated_delivery_time_min: businessData.ucpConfig?.operations?.estimatedDeliveryTime?.min,
+          estimated_delivery_time_max: businessData.ucpConfig?.operations?.estimatedDeliveryTime?.max,
+          pickup_preparation_time_minutes: businessData.ucpConfig?.operations?.pickupPreparationTime,
+          payment_methods_supported: businessData.ucpConfig?.payment?.methods || { 
+            cash: true, 
+            card: false, 
+            wallet: { mercadoPago: false } 
+          },
+          payment_timing: businessData.ucpConfig?.payment?.timing || 'both',
+          return_policy: businessData.ucpConfig?.policies?.returnPolicy,
+          refund_policy: businessData.ucpConfig?.policies?.refundPolicy,
+          cancellation_window_minutes: businessData.ucpConfig?.policies?.cancellationWindow || 15,
+          business_contact_email: businessData.ucpConfig?.contact?.email,
+          business_contact_phone: businessData.ucpConfig?.contact?.phone,
+          responsible_person_name: businessData.ucpConfig?.contact?.responsiblePerson,
+          catalog_source_type: businessData.ucpConfig?.catalog?.sourceType || 'manual',
+          price_currency: businessData.ucpConfig?.catalog?.currency || 'ARS',
         });
         
         // Guardar la configuración completa del agente
@@ -78,9 +114,10 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
         }
         
         setSuccess(true);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error creating business:', err);
-        setError('Error al registrar el negocio. Por favor intenta nuevamente.');
+        const errorMessage = err?.message || 'Error al registrar el negocio. Por favor intenta nuevamente.';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

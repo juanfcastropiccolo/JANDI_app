@@ -18,6 +18,7 @@ import { Address } from './onboarding.types';
 
 export interface Business {
   id: string;
+  // Campos en snake_case (como están en la BD)
   business_name: string;
   legal_name?: string;
   description?: string;
@@ -69,6 +70,14 @@ export interface Business {
   price_currency: string;
   agent_card: Record<string, unknown>;
   business_config: Record<string, unknown>;
+  
+  // Campos en camelCase (para compatibilidad con formularios)
+  // Estos se usan temporalmente antes del mapeo a snake_case
+  businessName?: string;
+  legalName?: string;
+  businessType?: 'restaurant' | 'store' | 'pharmacy' | 'supermarket';
+  taxId?: string;
+  legalEntityType?: 'individual' | 'company';
 }
 
 export interface BusinessHours {

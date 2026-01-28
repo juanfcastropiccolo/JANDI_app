@@ -92,18 +92,81 @@ export class BusinessService {
    * Crear un nuevo negocio
    */
   async createBusiness(businessData: Partial<Business>): Promise<Business> {
+    // Mapear los datos del formulario a los campos de la base de datos
+    const dbData = {
+      // Campos básicos (mapeo camelCase -> snake_case)
+      business_name: businessData.businessName,
+      legal_name: businessData.legalName,
+      description: businessData.description,
+      email: businessData.email,
+      phone: businessData.phone,
+      website_url: businessData.website_url,
+      address: businessData.address,
+      
+      // Campos legales
+      tax_id: businessData.taxId,
+      business_type: businessData.businessType,
+      legal_entity_type: businessData.legalEntityType,
+      
+      // Campos de delivery (desde DeliveryStep)
+      delivery_radius_km: businessData.delivery_radius_km,
+      delivery_fee: businessData.delivery_fee,
+      min_order_amount: businessData.min_order_amount,
+      
+      // Campos nuevos con valores por defecto seguros
+      operating_regions: businessData.operating_regions || [],
+      delivery_methods: businessData.delivery_methods || { delivery: true, pickup: false },
+      delivery_zones: businessData.delivery_zones || [],
+      estimated_delivery_time_min: businessData.estimated_delivery_time_min,
+      estimated_delivery_time_max: businessData.estimated_delivery_time_max,
+      pickup_preparation_time_minutes: businessData.pickup_preparation_time_minutes,
+      payment_methods_supported: businessData.payment_methods_supported || { 
+        cash: true, 
+        card: false, 
+        wallet: { mercadoPago: false } 
+      },
+      payment_timing: businessData.payment_timing || 'both',
+      return_policy: businessData.return_policy,
+      refund_policy: businessData.refund_policy,
+      cancellation_window_minutes: businessData.cancellation_window_minutes || 15,
+      business_contact_email: businessData.business_contact_email,
+      business_contact_phone: businessData.business_contact_phone,
+      responsible_person_name: businessData.responsible_person_name,
+      catalog_source_type: businessData.catalog_source_type || 'manual',
+      price_currency: businessData.price_currency || 'ARS',
+      
+      // JSON fields con defaults seguros
+      agent_card: businessData.agent_card || {},
+      business_config: businessData.business_config || {},
+      
+      // Estados iniciales
+      is_active: false,
+      is_verified: false,
+      onboarding_completed: false,
+    };
+
+    // Remover valores undefined para que la BD use sus defaults
+    const cleanedData = Object.fromEntries(
+      Object.entries(dbData).filter(([_, v]) => v !== undefined)
+    );
+
+    console.log('Creating business with data:', JSON.stringify(cleanedData, null, 2));
+
     const { data, error } = await supabase
       .from('businesses')
-      .insert({
-        ...businessData,
-        is_active: false,
-        is_verified: false,
-        onboarding_completed: false,
-      })
+      .insert(cleanedData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      throw new Error(`Error al crear negocio: ${error.message}`);
+    }
 
     // Generar y guardar UCP profile
     const ucpProfile = this.generateUCPProfile(data.id);
