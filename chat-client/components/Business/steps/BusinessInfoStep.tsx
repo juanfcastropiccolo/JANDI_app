@@ -37,6 +37,7 @@ interface BusinessInfoStepProps {
   data: BusinessInfoData | null;
   onChange: (data: BusinessInfoData) => void;
   onValidationChange: (isValid: boolean) => void;
+  userEmail?: string;
 }
 
 const BUSINESS_TYPES = [
@@ -47,13 +48,13 @@ const BUSINESS_TYPES = [
   { value: 'other', label: 'Otro' },
 ];
 
-export function BusinessInfoStep({ data, onChange, onValidationChange }: BusinessInfoStepProps) {
+export function BusinessInfoStep({ data, onChange, onValidationChange, userEmail }: BusinessInfoStepProps) {
   const [formData, setFormData] = useState<BusinessInfoData>(
     data || {
       businessName: '',
       legalName: '',
       businessType: '',
-      email: '',
+      email: userEmail || '',
       phone: '',
       address: {
         street: '',
@@ -170,8 +171,14 @@ export function BusinessInfoStep({ data, onChange, onValidationChange }: Busines
             placeholder="contacto@tunegocio.com"
             className="w-full pl-10 pr-4 py-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:border-[var(--jandi-light-blue)]"
             style={{ borderColor: 'var(--jandi-gray-light)' }}
+            disabled={!!userEmail}
           />
         </div>
+        {userEmail && (
+          <p className="text-xs mt-1" style={{ color: 'var(--jandi-gray)' }}>
+            ℹ️ Este es el email de tu cuenta de usuario
+          </p>
+        )}
       </div>
 
       {/* Phone */}

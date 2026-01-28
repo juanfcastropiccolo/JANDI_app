@@ -15,30 +15,21 @@
  */
 
 import React from 'react';
+import { useParams } from 'react-router-dom';
+import { BusinessHeader } from './BusinessHeader';
+import { BusinessNavigation } from './BusinessNavigation';
+import { BusinessConfigPanel } from '../BusinessConfigPanel';
 
-interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
-  message?: string;
-}
-
-export function LoadingSpinner({ size = 'md', message }: LoadingSpinnerProps) {
-  const sizeClasses = {
-    sm: 'h-6 w-6',
-    md: 'h-12 w-12',
-    lg: 'h-16 w-16',
-  };
+export function BusinessConfigPage() {
+  const { businessId } = useParams<{ businessId: string }>();
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div 
-        className={`animate-spin rounded-full border-b-2 ${sizeClasses[size]}`}
-        style={{ borderColor: 'var(--jandi-light-blue)' }}
-      />
-      {message && (
-        <p className="mt-4 text-sm" style={{ color: 'var(--jandi-gray)' }}>
-          {message}
-        </p>
-      )}
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--jandi-background)' }}>
+      <BusinessHeader />
+      <BusinessNavigation />
+      <div className="py-8">
+        {businessId && <BusinessConfigPanel businessId={businessId} />}
+      </div>
     </div>
   );
 }

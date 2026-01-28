@@ -15,106 +15,53 @@
  */
 
 import { supabase } from './supabase';
-import type { LoginCredentials, RegisterCredentials, User } from '../types/auth.types';
+import type { User } from '@supabase/supabase-js';
 
 export class AuthService {
   /**
-   * Login con email y contraseña
+   * Registrar nuevo usuario de negocio
    */
-  async login(credentials: LoginCredentials): Promise<User> {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: credentials.email,
-      password: credentials.password,
-    });
-
-    if (error) throw error;
-    if (!data.user) throw new Error('No user returned from login');
-
-    // Actualizar last_login_at
-    await supabase
-      .from('users')
-      .update({ last_login_at: new Date().toISOString() })
-      .eq('id', data.user.id);
-
-    // Obtener datos completos del usuario
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
-
-    if (userError) throw userError;
-    return userData as User;
-  }
-
-  /**
-   * Registro con email y contraseña
-   */
-  async register(credentials: RegisterCredentials): Promise<User> {
+  async signUpBusiness(email: string, password: string) {
     const { data, error } = await supabase.auth.signUp({
-      email: credentials.email,
-      password: credentials.password,
+      email,
+      password,
       options: {
         data: {
-          full_name: credentials.full_name,
+          user_type: 'business',
+          onboarding_completed: false,
+          onboarding_step: 1,
         },
       },
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('No user returned from registration');
-
-    // Crear registro en tabla users
-    const { data: userData, error: insertError } = await supabase
-      .from('users')
-      .insert({
-        id: data.user.id,
-        email: credentials.email,
-        full_name: credentials.full_name,
-        auth_provider: 'email',
-        onboarding_completed: false,
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-    return userData as User;
+    return data;
   }
 
   /**
-   * Login con Google OAuth
+   * Login de usuario de negocio
    */
-  async loginWithGoogle(): Promise<void> {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
+  async signInBusiness(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
     if (error) throw error;
+    
+    // Verificar que sea un usuario de tipo business
+    if (data.user?.user_metadata?.user_type !== 'business') {
+      throw new Error('Este usuario no es un negocio');
+    }
+
+    return data;
   }
 
   /**
    * Logout
    */
-  async logout(): Promise<void> {
+  async signOut() {
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  }
-
-  /**
-   * Reset password
-   */
-  async resetPassword(email: string): Promise<void> {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-
     if (error) throw error;
   }
 
@@ -122,106 +69,28 @@ export class AuthService {
    * Obtener usuario actual
    */
   async getCurrentUser(): Promise<User | null> {
-    console.log('[authService] getCurrentUser: START');
-    
-    try {
-      // 1. Obtener el usuario auth
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError) {
-        console.error('[authService] getCurrentUser: Auth error:', authError);
-        throw authError;
-      }
-      
-      if (!user) {
-        console.log('[authService] getCurrentUser: No auth user');
-        return null;
-      }
-
-      console.log('[authService] getCurrentUser: Auth user OK:', user.id);
-
-      // 2. Query con timeout y sin .single() para evitar error 406
-      const queryStartTime = Date.now();
-      
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Query timeout (3s)'));
-        }, 3000);
-      });
-      
-      // Usar .maybeSingle() en lugar de .single() para no lanzar error si no hay filas
-      const queryPromise = supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      const result = await Promise.race([queryPromise, timeoutPromise]);
-
-      const queryDuration = Date.now() - queryStartTime;
-      console.log(`[authService] getCurrentUser: Query done in ${queryDuration}ms`);
-
-      const { data, error } = result as any;
-
-      if (error) {
-        console.error('[authService] getCurrentUser: Query error:', error.code, error.message);
-        
-        // Si es error de RLS o permisos, devolver null (no lanzar error)
-        if (error.code === '42501' || error.message.includes('permission denied')) {
-          console.warn('[authService] getCurrentUser: RLS permission denied, user may not exist yet');
-          return null;
-        }
-        
-        throw error;
-      }
-
-      if (!data) {
-        console.warn('[authService] getCurrentUser: User not in DB yet');
-        return null;
-      }
-
-      console.log('[authService] getCurrentUser: ✅ SUCCESS:', data.email);
-      return data as User;
-    } catch (err) {
-      // Si es timeout, devolver null en lugar de lanzar error
-      if (err instanceof Error && err.message.includes('Query timeout')) {
-        console.warn('[authService] getCurrentUser: ⚠️ Query timeout, user may still be creating');
-        return null;
-      }
-      
-      console.error('[authService] getCurrentUser: ❌ ERROR:', err);
-      throw err;
-    }
-  }
-
-  /**
-   * Verificar si el usuario completó el onboarding
-   */
-  async checkOnboardingStatus(userId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('onboarding_completed')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error('Error checking onboarding status:', error);
-      return false;
-    }
-
-    return data?.onboarding_completed || false;
-  }
-
-  /**
-   * Marcar onboarding como completado
-   */
-  async completeOnboarding(userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .update({ onboarding_completed: true })
-      .eq('id', userId);
-
+    const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
+    return user;
+  }
+
+  /**
+   * Actualizar metadata del usuario
+   */
+  async updateUserMetadata(metadata: any) {
+    const { data, error } = await supabase.auth.updateUser({
+      data: metadata,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Verificar si hay sesión activa
+   */
+  async hasActiveSession(): Promise<boolean> {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
   }
 }
 

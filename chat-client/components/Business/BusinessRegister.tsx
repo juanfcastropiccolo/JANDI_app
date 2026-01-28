@@ -15,10 +15,12 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { StepProgress } from './StepProgress';
 import { NavigationButtons } from '../Onboarding/NavigationButtons';
+import { BusinessAuthStep } from './steps/BusinessAuthStep';
 import { BusinessInfoStep } from './steps/BusinessInfoStep';
 import { LegalInfoStep } from './steps/LegalInfoStep';
 import { CatalogStep } from './steps/CatalogStep';
@@ -27,6 +29,7 @@ import { UCPConfigStep } from './steps/UCPConfigStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { businessService } from '../../services/business.service';
 import { businessConfigService } from '../../services/business-config.service';
+import { authService } from '../../services/auth.service';
 import { ErrorMessage } from '../Shared/ErrorMessage';
 import { SuccessMessage } from '../Shared/SuccessMessage';
 
@@ -35,6 +38,7 @@ interface BusinessRegisterProps {
 }
 
 const STEP_LABELS = [
+  'Crear Cuenta',
   'Info Básica',
   'Documentación',
   'Catálogo',
@@ -44,13 +48,16 @@ const STEP_LABELS = [
 ];
 
 export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [canProceed, setCanProceed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdBusinessId, setCreatedBusinessId] = useState<string | null>(null);
 
   const [businessData, setBusinessData] = useState<any>({
+    auth: null,
     basicInfo: null,
     legalInfo: null,
     catalog: null,
@@ -59,11 +66,22 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
   });
 
   const handleNext = async () => {
-    if (currentStep === 6) {
+    if (currentStep === 7) {
       // Submit final
       try {
         setLoading(true);
         setError(null);
+        
+        // Verificar que el usuario esté autenticado
+        const user = await authService.getCurrentUser();
+        
+        if (!user) {
+          setError('Sesión expirada. Por favor, vuelve a iniciar el proceso.');
+          setLoading(false);
+          return;
+        }
+        
+        console.log('🔐 Usuario autenticado:', user.email);
         
         // Crear el negocio primero - mapear correctamente los campos
         const business = await businessService.createBusiness({
@@ -71,7 +89,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
           businessName: businessData.basicInfo?.businessName,
           legalName: businessData.basicInfo?.legalName,
           businessType: businessData.basicInfo?.businessType,
-          email: businessData.basicInfo?.email,
+          email: user.email!, // IMPORTANTE: Usar email del usuario autenticado
           phone: businessData.basicInfo?.phone,
           address: businessData.basicInfo?.address,
           description: businessData.basicInfo?.description,
@@ -113,7 +131,21 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
           await businessConfigService.saveConfiguration(business.id, businessData.ucpConfig);
         }
         
+        // Marcar onboarding como completado
+        await authService.updateUserMetadata({
+          onboarding_completed: true,
+          business_id: business.id,
+        });
+        
+        console.log('✅ Negocio creado exitosamente:', business.id);
+        
+        setCreatedBusinessId(business.id);
         setSuccess(true);
+        
+        // Redirigir al dashboard después de 2 segundos
+        setTimeout(() => {
+          navigate(`/business/dashboard/${business.id}`);
+        }, 2000);
       } catch (err: any) {
         console.error('Error creating business:', err);
         const errorMessage = err?.message || 'Error al registrar el negocio. Por favor intenta nuevamente.';
@@ -148,13 +180,22 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
     switch (currentStep) {
       case 1:
         return (
-          <BusinessInfoStep
-            data={businessData.basicInfo}
-            onChange={(data) => handleStepDataChange('basicInfo', data)}
+          <BusinessAuthStep
+            data={businessData.auth}
+            onChange={(data) => handleStepDataChange('auth', data)}
             onValidationChange={setCanProceed}
           />
         );
       case 2:
+        return (
+          <BusinessInfoStep
+            data={businessData.basicInfo}
+            onChange={(data) => handleStepDataChange('basicInfo', data)}
+            onValidationChange={setCanProceed}
+            userEmail={businessData.auth?.email}
+          />
+        );
+      case 3:
         return (
           <LegalInfoStep
             data={businessData.legalInfo}
@@ -162,7 +203,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 3:
+      case 4:
         return (
           <CatalogStep
             data={businessData.catalog}
@@ -170,7 +211,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 4:
+      case 5:
         return (
           <DeliveryStep
             data={businessData.delivery}
@@ -178,7 +219,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 5:
+      case 6:
         return (
           <UCPConfigStep
             businessData={businessData}
@@ -187,7 +228,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             onValidationChange={setCanProceed}
           />
         );
-      case 6:
+      case 7:
         return (
           <ReviewStep
             businessData={businessData}
@@ -213,18 +254,12 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
             </svg>
           </div>
           <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--jandi-dark-blue)' }}>
-            ¡Solicitud enviada!
+            ¡Negocio registrado exitosamente!
           </h2>
           <p className="mb-6" style={{ color: 'var(--jandi-gray)' }}>
-            Tu solicitud está en revisión. Te contactaremos pronto por email con los próximos pasos.
+            Tu negocio ha sido creado. Redirigiendo a tu dashboard...
           </p>
-          <button
-            onClick={onNavigateBack}
-            className="px-6 py-3 rounded-lg font-medium text-white transition-all duration-200 hover:scale-105"
-            style={{ backgroundColor: 'var(--jandi-light-blue)' }}
-          >
-            Volver al inicio
-          </button>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: 'var(--jandi-light-blue)' }} />
         </motion.div>
       </div>
     );
@@ -250,7 +285,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <StepProgress currentStep={currentStep} totalSteps={6} stepLabels={STEP_LABELS} />
+        <StepProgress currentStep={currentStep} totalSteps={7} stepLabels={STEP_LABELS} />
 
         {error && (
           <div className="mb-6">
@@ -271,7 +306,7 @@ export function BusinessRegister({ onNavigateBack }: BusinessRegisterProps) {
           {/* Navigation Buttons */}
           <NavigationButtons
             currentStep={currentStep}
-            totalSteps={6}
+            totalSteps={7}
             onPrevious={handlePrevious}
             onNext={handleNext}
             canProceed={canProceed}

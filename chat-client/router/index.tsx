@@ -26,6 +26,12 @@ import { AuthCallbackSimple } from '../components/Auth/AuthCallbackSimple';
 import { OnboardingContainer } from '../components/Onboarding/OnboardingContainer';
 import { BusinessLanding } from '../components/Business/BusinessLanding';
 import { BusinessRegister } from '../components/Business/BusinessRegister';
+import { BusinessDashboard } from '../components/Business/Dashboard/BusinessDashboard';
+import { ProductsManagement } from '../components/Business/Dashboard/ProductsManagement';
+import { OrdersManagement } from '../components/Business/Dashboard/OrdersManagement';
+import { BusinessConfigPage } from '../components/Business/Dashboard/BusinessConfigPage';
+import { BusinessProfile } from '../components/Business/Dashboard/BusinessProfile';
+import { ProtectedRoute } from '../components/Shared/ProtectedRoute';
 import App from '../App';
 
 // Componentes wrapper que usan useNavigate para evitar recargas de página
@@ -142,6 +148,68 @@ export const router = createBrowserRouter([
   {
     path: '/business/register',
     element: <BusinessRegisterRoute />,
+  },
+  {
+    path: '/business/dashboard/:businessId',
+    element: (
+      <ProtectedRoute userType="business">
+        <BusinessDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/business/products/:businessId',
+    element: (
+      <ProtectedRoute userType="business">
+        <ProductsManagement />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/business/orders/:businessId',
+    element: (
+      <ProtectedRoute userType="business">
+        <OrdersManagement />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/business/config/:businessId',
+    element: (
+      <ProtectedRoute userType="business">
+        <BusinessConfigPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/business/profile/:businessId',
+    element: (
+      <ProtectedRoute userType="business">
+        <BusinessProfile />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/unauthorized',
+    element: (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--jandi-background)' }}>
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4" style={{ color: 'var(--jandi-dark-blue)' }}>
+            🚫 Acceso No Autorizado
+          </h1>
+          <p className="mb-6" style={{ color: 'var(--jandi-gray)' }}>
+            No tienes permiso para acceder a este recurso
+          </p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="px-6 py-3 rounded-lg font-medium text-white"
+            style={{ backgroundColor: 'var(--jandi-light-blue)' }}
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    ),
   },
   {
     path: '*',
