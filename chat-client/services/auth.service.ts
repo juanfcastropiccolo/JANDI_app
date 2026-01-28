@@ -28,19 +28,20 @@ export class AuthService {
     try {
       console.log('[AuthService] Getting full user...');
       
-      // 1. Obtener Auth User de Supabase
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      // 1. Primero verificar si hay sesión activa
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (authError) {
-        console.error('[AuthService] Error getting auth user:', authError);
-        throw authError;
+      if (sessionError) {
+        console.error('[AuthService] Error getting session:', sessionError);
+        return null;
       }
       
-      if (!authUser) {
-        console.log('[AuthService] No auth user found');
+      if (!session || !session.user) {
+        console.log('[AuthService] No active session');
         return null;
       }
 
+      const authUser = session.user;
       console.log('[AuthService] Auth user found:', authUser.id, authUser.email);
 
       // 2. Obtener datos de la tabla users
