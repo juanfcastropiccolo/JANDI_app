@@ -130,13 +130,7 @@ export function AuthCallbackSimple() {
 }
 
 /**
- * Función auxiliar para redirigir al usuario
- * 
- * Redirigimos a /chat y dejamos que el OnboardingGuard se encargue de:
- * - Si el usuario NO completó onboarding → redirige a /onboarding
- * - Si el usuario SÍ completó onboarding → permite acceso a /chat
- * 
- * Esto funciona tanto para usuarios nuevos como para usuarios existentes.
+ * Función auxiliar para crear/actualizar usuario en tabla users y redirigir
  */
 async function handleUserProfile(
   user: any, 
@@ -146,9 +140,16 @@ async function handleUserProfile(
 ) {
   try {
     if (!alive) return;
-    setMessage('¡Listo! Redirigiendo...');
-
+    
     console.log('[AuthCallbackSimple] Usuario autenticado:', user.email);
+    setMessage('Configurando tu perfil...');
+
+    // CRÍTICO: Asegurar que el usuario existe en la tabla users
+    await ensureUserInDatabase(user);
+    
+    if (!alive) return;
+    
+    setMessage('¡Listo! Redirigiendo...');
     
     // Redirigir a /chat - El OnboardingGuard verificará automáticamente
     // si el usuario necesita completar el onboarding
@@ -156,11 +157,92 @@ async function handleUserProfile(
     console.log('[AuthCallbackSimple] (El OnboardingGuard verificará estado de onboarding)');
     console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
     
+    // Pequeño delay para asegurar que la base de datos está actualizada
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     if (alive) {
       navigate('/chat', { replace: true });
     }
   } catch (err) {
     console.error('[AuthCallbackSimple] Error en handleUserProfile:', err);
     throw err;
+  }
+}
+
+/**
+ * Asegurar que el usuario existe en la tabla users
+ * Esta función crea o actualiza el registro del usuario en nuestra tabla custom
+ */
+async function ensureUserInDatabase(authUser: any): Promise<void> {
+  console.log('[AuthCallbackSimple] Verificando usuario en base de datos...');
+  
+  const email = authUser.email;
+  if (!email) {
+    throw new Error('No se encontró email en el usuario autenticado');
+  }
+
+  // Extraer datos del usuario de Google
+  const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name;
+  const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture;
+  const googleId = authUser.identities?.find((i: any) => i.provider === 'google')?.id;
+
+  // Verificar si el usuario ya existe
+  const { data: existing, error: existingError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', authUser.id)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error('[AuthCallbackSimple] Error verificando usuario:', existingError);
+    throw existingError;
+  }
+
+  const now = new Date().toISOString();
+
+  if (!existing) {
+    // Usuario nuevo: crear registro
+    console.log('[AuthCallbackSimple] Usuario no existe, creando...');
+    
+    const { error: insertError } = await supabase.from('users').insert({
+      id: authUser.id,
+      email,
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      google_id: googleId,
+      auth_provider: 'google',
+      onboarding_completed: false,
+      is_active: true,
+      last_login_at: now,
+      metadata: authUser.user_metadata || {},
+    });
+    
+    if (insertError) {
+      console.error('[AuthCallbackSimple] Error creando usuario:', insertError);
+      throw insertError;
+    }
+    
+    console.log('[AuthCallbackSimple] ✅ Usuario creado exitosamente');
+  } else {
+    // Usuario existente: actualizar last_login_at
+    console.log('[AuthCallbackSimple] Usuario existe, actualizando last_login...');
+    
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        last_login_at: now,
+        // Actualizar datos que puedan haber cambiado en Google
+        full_name: fullName || existing.full_name,
+        avatar_url: avatarUrl || existing.avatar_url,
+        google_id: googleId || existing.google_id,
+      })
+      .eq('id', authUser.id);
+
+    if (updateError) {
+      console.error('[AuthCallbackSimple] Error actualizando usuario:', updateError);
+      throw updateError;
+    }
+    
+    console.log('[AuthCallbackSimple] ✅ Usuario actualizado exitosamente');
   }
 }
