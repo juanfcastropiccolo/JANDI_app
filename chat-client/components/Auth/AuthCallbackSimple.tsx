@@ -59,28 +59,64 @@ export function AuthCallbackSimple() {
         if (!alive) return;
         
         if (code) {
-          // Si hay código, intercambiarlo por sesión
+          // Si hay código, intentar reutilizar sesión existente (detectSessionInUrl puede haberla creado)
           setMessage('Intercambiando código de autenticación...');
+          console.log('[AuthCallbackSimple] Code in URL, checking existing session...');
+
+          const { data: preSessionData, error: preSessionError } = await supabase.auth.getSession();
+          if (preSessionError) {
+            console.warn('[AuthCallbackSimple] Error checking existing session:', preSessionError);
+          }
+
+          if (preSessionData.session?.user) {
+            console.log('[AuthCallbackSimple] ✅ Existing session found before exchange:', preSessionData.session.user.email);
+            window.history.replaceState({}, document.title, url.pathname);
+            if (!alive) return;
+            await handleUserProfile(preSessionData.session.user, alive, setMessage, navigate);
+            return;
+          }
+
+          // Si no hay sesión, intercambiar código con timeout de seguridad
           console.log('[AuthCallbackSimple] Exchanging code for session...');
-          
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          
+
+          const exchangePromise = supabase.auth.exchangeCodeForSession(code);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout al intercambiar código')), 8000);
+          });
+
+          let exchangeResult;
+          try {
+            exchangeResult = await Promise.race([exchangePromise, timeoutPromise]);
+          } catch (err) {
+            console.warn('[AuthCallbackSimple] Exchange timeout/error, re-checking session...', err);
+            const { data: retrySessionData } = await supabase.auth.getSession();
+            if (retrySessionData.session?.user) {
+              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange issue:', retrySessionData.session.user.email);
+              window.history.replaceState({}, document.title, url.pathname);
+              if (!alive) return;
+              await handleUserProfile(retrySessionData.session.user, alive, setMessage, navigate);
+              return;
+            }
+            throw err;
+          }
+
+          const { data, error: exchangeError } = exchangeResult;
           if (exchangeError) {
             console.error('[AuthCallbackSimple] Error exchanging code:', exchangeError);
             throw exchangeError;
           }
-          
+
           if (!data.session || !data.session.user) {
             throw new Error('No se pudo obtener la sesión después del intercambio');
           }
-          
+
           console.log('[AuthCallbackSimple] ✅ Code exchanged successfully:', data.session.user.email);
-          
+
           // Limpiar la URL
           window.history.replaceState({}, document.title, url.pathname);
-          
+
           if (!alive) return;
-          
+
           // Procesar perfil del usuario
           await handleUserProfile(data.session.user, alive, setMessage, navigate);
         } else {
