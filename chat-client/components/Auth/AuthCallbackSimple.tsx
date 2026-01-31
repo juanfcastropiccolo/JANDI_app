@@ -17,6 +17,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
+import { authService } from '../../services/auth.service';
 import { LoadingSpinner } from '../Shared/LoadingSpinner';
 
 /**
@@ -172,17 +173,39 @@ async function handleUserProfile(
     
     setMessage('¡Listo! Redirigiendo...');
     
-    // Redirigir a /chat - El OnboardingGuard verificará automáticamente
-    // si el usuario necesita completar el onboarding
-    console.log('[AuthCallbackSimple] Redirigiendo a: /chat');
-    console.log('[AuthCallbackSimple] (El OnboardingGuard verificará estado de onboarding)');
+    const fullUser = await authService.getFullUser();
+    if (!fullUser) {
+      throw new Error('No se pudo cargar el perfil del usuario');
+    }
+
+    let destination = fullUser.onboarding_completed ? '/chat' : '/onboarding';
+    if (fullUser.user_type === 'business') {
+      try {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('email', fullUser.email)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        destination = data?.id ? `/business/dashboard/${data.id}` : '/business/onboarding';
+      } catch (err) {
+        console.error('[AuthCallbackSimple] Error resolving business destination:', err);
+        destination = '/business/onboarding';
+      }
+    }
+
+    console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
     console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
     
     // Pequeño delay para asegurar que la base de datos está actualizada
     await new Promise(resolve => setTimeout(resolve, 300));
     
     if (alive) {
-      navigate('/chat', { replace: true });
+      navigate(destination, { replace: true });
     }
   } catch (err) {
     console.error('[AuthCallbackSimple] Error en handleUserProfile:', err);

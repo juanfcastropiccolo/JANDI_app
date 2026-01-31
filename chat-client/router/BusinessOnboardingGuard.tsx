@@ -40,7 +40,7 @@ export function BusinessOnboardingGuard({ children }: BusinessOnboardingGuardPro
       console.log('🔍 BusinessOnboardingGuard - Verificando acceso para:', user.email);
 
       // Verificar tipo de usuario
-      const userType = user.user_metadata?.user_type;
+      const userType = user.user_type || 'consumer';
       if (userType !== 'business') {
         console.log('❌ Usuario no es de tipo business:', userType);
         setHasAccess(false);

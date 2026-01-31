@@ -53,8 +53,18 @@ export function BusinessAuthCallback() {
           if (data.session) {
             console.log('✅ Sesión establecida:', data.session.user.email);
 
-            // Verificar que sea un usuario de negocio
-            const userType = data.session.user.user_metadata?.user_type;
+            // Verificar que sea un usuario de negocio (priorizar tabla users)
+            const { data: dbUser, error: dbError } = await supabase
+              .from('users')
+              .select('user_type')
+              .eq('id', data.session.user.id)
+              .single();
+
+            if (dbError && dbError.code !== 'PGRST116') {
+              throw dbError;
+            }
+
+            const userType = dbUser?.user_type ?? data.session.user.user_metadata?.user_type;
             
             if (userType !== 'business') {
               console.error('❌ Usuario no es de tipo negocio:', userType);
@@ -83,8 +93,18 @@ export function BusinessAuthCallback() {
           if (session) {
             console.log('✅ Sesión obtenida:', session.user.email);
 
-            // Verificar que sea un usuario de negocio
-            const userType = session.user.user_metadata?.user_type;
+            // Verificar que sea un usuario de negocio (priorizar tabla users)
+            const { data: dbUser, error: dbError } = await supabase
+              .from('users')
+              .select('user_type')
+              .eq('id', session.user.id)
+              .single();
+
+            if (dbError && dbError.code !== 'PGRST116') {
+              throw dbError;
+            }
+
+            const userType = dbUser?.user_type ?? session.user.user_metadata?.user_type;
             
             if (userType !== 'business') {
               console.error('❌ Usuario no es de tipo negocio:', userType);

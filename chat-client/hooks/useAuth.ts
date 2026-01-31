@@ -75,7 +75,8 @@ export function useAuth() {
       });
 
       if (signInError) throw signInError;
-      setUser(data.user);
+      const fullUser = await authService.getFullUser();
+      setUser(fullUser);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión';
       setError(errorMessage);
@@ -102,7 +103,8 @@ export function useAuth() {
       });
 
       if (signUpError) throw signUpError;
-      setUser(data.user);
+      const fullUser = await authService.getFullUser();
+      setUser(fullUser);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al registrarse';
       setError(errorMessage);

@@ -53,8 +53,18 @@ export function BusinessLoginForm({
 
       console.log('✅ Login exitoso:', data.user?.email);
 
-      // 2. Verificar que sea usuario de negocio
-      const userType = data.user?.user_metadata?.user_type;
+      // 2. Verificar que sea usuario de negocio (priorizar tabla users)
+      const { data: dbUser, error: dbError } = await supabase
+        .from('users')
+        .select('user_type')
+        .eq('id', data.user?.id)
+        .single();
+
+      if (dbError && dbError.code !== 'PGRST116') {
+        throw dbError;
+      }
+
+      const userType = dbUser?.user_type ?? data.user?.user_metadata?.user_type;
       if (userType !== 'business') {
         await supabase.auth.signOut();
         throw new Error('Esta cuenta no es de tipo negocio. Por favor usa el login de usuarios.');

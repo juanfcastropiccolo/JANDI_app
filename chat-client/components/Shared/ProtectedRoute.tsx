@@ -38,7 +38,7 @@ export function ProtectedRoute({ children, userType }: ProtectedRouteProps) {
       }
 
       // Verificar tipo de usuario si se especifica
-      if (userType && user.user_metadata?.user_type !== userType) {
+      if (userType && user.user_type !== userType) {
         setHasAccess(false);
         setChecking(false);
         return;

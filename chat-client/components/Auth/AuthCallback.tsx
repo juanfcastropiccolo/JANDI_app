@@ -206,25 +206,44 @@ export function AuthCallback() {
         if (!alive) return;
 
         console.log('[AuthCallback] Loading user profile...');
-        // Reintentar cargar el perfil un par de veces si falla (por latencia de replicación/RLS)
+        // Reintentar cargar el perfil completo un par de veces si falla (por latencia de replicación/RLS)
         let currentUser = null;
         for (let i = 0; i < 3; i++) {
-            currentUser = await authService.getCurrentUser();
-            if (currentUser) break;
-            await new Promise(resolve => setTimeout(resolve, 500));
+          currentUser = await authService.getFullUser();
+          if (currentUser) break;
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         if (!currentUser) {
           throw new Error('No se pudo cargar el perfil del usuario después de varios intentos');
         }
 
-        console.log('[AuthCallback] User loaded:', currentUser.email);
+        console.log('[AuthCallback] User loaded:', currentUser.email, 'type:', currentUser.user_type);
 
         if (!alive) return;
 
         setMessage('¡Listo! Redirigiendo...');
         
-        const destination = currentUser.onboarding_completed ? '/chat' : '/onboarding';
+        let destination = currentUser.onboarding_completed ? '/chat' : '/onboarding';
+
+        if (currentUser.user_type === 'business') {
+          try {
+            const { data, error } = await supabase
+              .from('businesses')
+              .select('id')
+              .eq('email', currentUser.email)
+              .single();
+
+            if (error && error.code !== 'PGRST116') {
+              throw error;
+            }
+
+            destination = data?.id ? `/business/dashboard/${data.id}` : '/business/onboarding';
+          } catch (err) {
+            console.error('[AuthCallback] Error resolving business destination:', err);
+            destination = '/business/onboarding';
+          }
+        }
         console.log('[AuthCallback] Navigating to:', destination);
         
         // Pequeño delay antes de navegar para mostrar el mensaje
