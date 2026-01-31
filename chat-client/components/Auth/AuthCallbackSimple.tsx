@@ -57,22 +57,33 @@ export function AuthCallbackSimple() {
         console.log('[AuthCallbackSimple] Code in URL:', code ? 'YES' : 'NO');
 
         if (!alive) return;
+
+        const waitForSession = async (maxWaitMs: number, intervalMs: number) => {
+          const start = Date.now();
+          while (Date.now() - start < maxWaitMs) {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+              console.warn('[AuthCallbackSimple] Error getSession while waiting:', error);
+            }
+            if (data.session?.user) {
+              return data.session.user;
+            }
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+          }
+          return null;
+        };
         
         if (code) {
           // Si hay código, intentar reutilizar sesión existente (detectSessionInUrl puede haberla creado)
           setMessage('Intercambiando código de autenticación...');
           console.log('[AuthCallbackSimple] Code in URL, checking existing session...');
 
-          const { data: preSessionData, error: preSessionError } = await supabase.auth.getSession();
-          if (preSessionError) {
-            console.warn('[AuthCallbackSimple] Error checking existing session:', preSessionError);
-          }
-
-          if (preSessionData.session?.user) {
-            console.log('[AuthCallbackSimple] ✅ Existing session found before exchange:', preSessionData.session.user.email);
+          const sessionUser = await waitForSession(4000, 300);
+          if (sessionUser) {
+            console.log('[AuthCallbackSimple] ✅ Existing session found before exchange:', sessionUser.email);
             window.history.replaceState({}, document.title, url.pathname);
             if (!alive) return;
-            await handleUserProfile(preSessionData.session.user, alive, setMessage, navigate);
+            await handleUserProfile(sessionUser, alive, setMessage, navigate);
             return;
           }
 
@@ -89,12 +100,12 @@ export function AuthCallbackSimple() {
             exchangeResult = await Promise.race([exchangePromise, timeoutPromise]);
           } catch (err) {
             console.warn('[AuthCallbackSimple] Exchange timeout/error, re-checking session...', err);
-            const { data: retrySessionData } = await supabase.auth.getSession();
-            if (retrySessionData.session?.user) {
-              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange issue:', retrySessionData.session.user.email);
+            const retryUser = await waitForSession(4000, 300);
+            if (retryUser) {
+              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange issue:', retryUser.email);
               window.history.replaceState({}, document.title, url.pathname);
               if (!alive) return;
-              await handleUserProfile(retrySessionData.session.user, alive, setMessage, navigate);
+              await handleUserProfile(retryUser, alive, setMessage, navigate);
               return;
             }
             throw err;
@@ -202,14 +213,25 @@ async function handleUserProfile(
     console.log('[AuthCallbackSimple] Usuario autenticado:', user.email);
     setMessage('Configurando tu perfil...');
 
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number, errorMessage: string) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(errorMessage)), ms);
+      });
+      return Promise.race([promise, timeoutPromise]);
+    };
+
     // CRÍTICO: Asegurar que el usuario existe en la tabla users
-    await ensureUserInDatabase(user);
+    await withTimeout(ensureUserInDatabase(user), 8000, 'Timeout al crear/actualizar usuario');
     
     if (!alive) return;
     
     setMessage('¡Listo! Redirigiendo...');
     
-    const fullUser = await authService.getFullUser();
+    const fullUser = await withTimeout(
+      authService.getFullUser(),
+      8000,
+      'Timeout al cargar el perfil del usuario'
+    );
     if (!fullUser) {
       throw new Error('No se pudo cargar el perfil del usuario');
     }
