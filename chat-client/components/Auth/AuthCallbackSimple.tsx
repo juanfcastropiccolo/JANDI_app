@@ -58,6 +58,21 @@ export function AuthCallbackSimple() {
 
         if (!alive) return;
 
+        const waitForSession = async (maxWaitMs: number, intervalMs: number) => {
+          const start = Date.now();
+          while (Date.now() - start < maxWaitMs) {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+              console.warn('[AuthCallbackSimple] Error getSession while waiting:', error);
+            }
+            if (data.session?.user) {
+              return data.session.user;
+            }
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+          }
+          return null;
+        };
+
         if (code) {
           // Si hay código, intentar intercambiarlo por sesión
           setMessage('Intercambiando código de autenticación...');
@@ -79,6 +94,14 @@ export function AuthCallbackSimple() {
             );
           } catch (err) {
             console.warn('[AuthCallbackSimple] Exchange timeout/error, retrying once...', err);
+            const fallbackUser = await waitForSession(6000, 300);
+            if (fallbackUser) {
+              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange timeout:', fallbackUser.email);
+              window.history.replaceState({}, document.title, url.pathname);
+              if (!alive) return;
+              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
+              return;
+            }
             exchangeResult = await withTimeout(
               supabase.auth.exchangeCodeForSession(code),
               10000,
@@ -89,10 +112,26 @@ export function AuthCallbackSimple() {
           const { data, error: exchangeError } = exchangeResult;
           if (exchangeError) {
             console.error('[AuthCallbackSimple] Error exchanging code:', exchangeError);
+            const fallbackUser = await waitForSession(6000, 300);
+            if (fallbackUser) {
+              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange error:', fallbackUser.email);
+              window.history.replaceState({}, document.title, url.pathname);
+              if (!alive) return;
+              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
+              return;
+            }
             throw exchangeError;
           }
 
           if (!data.session || !data.session.user) {
+            const fallbackUser = await waitForSession(6000, 300);
+            if (fallbackUser) {
+              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange empty:', fallbackUser.email);
+              window.history.replaceState({}, document.title, url.pathname);
+              if (!alive) return;
+              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
+              return;
+            }
             throw new Error('No se pudo obtener la sesión después del intercambio');
           }
 
@@ -202,8 +241,27 @@ async function handleUserProfile(
     
     setMessage('¡Listo! Redirigiendo...');
     
+    const loadFullUser = async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const result = await authService.getFullUser();
+          if (result) return result;
+        } catch (err) {
+          const isAbort =
+            err instanceof Error &&
+            (err.name === 'AbortError' || err.message?.includes('aborted'));
+          if (!isAbort) {
+            throw err;
+          }
+          console.warn('[AuthCallbackSimple] getFullUser aborted, retrying...', err);
+        }
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      return null;
+    };
+
     const fullUser = await withTimeout(
-      authService.getFullUser(),
+      loadFullUser(),
       8000,
       'Timeout al cargar el perfil del usuario'
     );
