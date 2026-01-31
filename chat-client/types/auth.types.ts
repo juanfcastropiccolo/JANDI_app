@@ -35,6 +35,7 @@ export interface User extends Partial<SupabaseUser> {
   auth_provider: 'email' | 'google';
   is_active: boolean;
   onboarding_completed: boolean;
+  user_type: 'consumer' | 'business'; // ✅ Columna user_type de la tabla users
   created_at: string;
   updated_at: string;
   last_login_at?: string;

@@ -25,9 +25,27 @@ interface OnboardingGuardProps {
 export function OnboardingGuard({ children }: OnboardingGuardProps) {
   const { user } = useAuthContext();
 
-  // Si el usuario no completó el onboarding, redirigir
-  if (user && !user.onboarding_completed) {
-    return <Navigate to="/onboarding" replace />;
+  if (user) {
+    // Obtener tipo de usuario de la columna user_type (por defecto 'consumer')
+    const userType = user.user_type || 'consumer';
+    
+    console.log('[OnboardingGuard] User type:', userType, 'onboarding_completed:', user.onboarding_completed);
+    
+    // Si es usuario business, permitir acceso sin verificar onboarding
+    // Los usuarios business tienen su propio flujo de onboarding
+    if (userType === 'business') {
+      console.log('[OnboardingGuard] Business user detected, allowing access');
+      return <>{children}</>;
+    }
+    
+    // Si es usuario consumer (tipo por defecto)
+    // Verificar si completó el onboarding de consumidor
+    if (!user.onboarding_completed) {
+      console.log('[OnboardingGuard] Consumer user without onboarding, redirecting to /onboarding');
+      return <Navigate to="/onboarding" replace />;
+    }
+    
+    console.log('[OnboardingGuard] Consumer user with onboarding completed, allowing access');
   }
 
   return <>{children}</>;

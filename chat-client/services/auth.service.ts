@@ -75,6 +75,8 @@ export class AuthService {
         phone: dbUser.phone,
         auth_provider: dbUser.auth_provider,
         is_active: dbUser.is_active,
+        user_type: dbUser.user_type || 'consumer', // ✅ Asegurar user_type
+        metadata: dbUser.metadata || {}, // Mantener metadata por si acaso
         // Mantener propiedades de Auth que no están en la tabla
         email: authUser.email!,
         id: authUser.id,
@@ -83,6 +85,7 @@ export class AuthService {
       console.log('[AuthService] Full user assembled:', {
         id: fullUser.id,
         email: fullUser.email,
+        user_type: fullUser.user_type,
         onboarding_completed: fullUser.onboarding_completed,
       });
 
