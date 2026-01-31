@@ -20,13 +20,12 @@ import { supabase } from '../../services/supabase';
 import { LoadingSpinner } from '../Shared/LoadingSpinner';
 
 /**
- * AuthCallbackSimple - Componente simplificado para OAuth callback
+ * AuthCallbackSimple - Componente para OAuth callback
  * 
- * Con detectSessionInUrl: true, Supabase maneja automáticamente el intercambio
- * de código por sesión. Este componente solo:
- * 1. Verifica que la sesión exista
- * 2. Crea el perfil del usuario en la DB si no existe (sin RLS habilitado temporalmente)
- * 3. Redirige al usuario según su estado de onboarding
+ * Estrategia simple y robusta:
+ * 1. Esperar a que exista sesión (Supabase la crea automáticamente)
+ * 2. Asegurar usuario en tabla users
+ * 3. Redirigir según tipo de usuario
  */
 export function AuthCallbackSimple() {
   const navigate = useNavigate();
@@ -35,6 +34,7 @@ export function AuthCallbackSimple() {
 
   useEffect(() => {
     let alive = true;
+    let pollInterval: NodeJS.Timeout | null = null;
 
     const handleCallback = async () => {
       try {
@@ -51,121 +51,44 @@ export function AuthCallbackSimple() {
           throw new Error(msg);
         }
 
-        // 2. Verificar si hay código de autorización en la URL
-        const code = url.searchParams.get('code');
-        console.log('[AuthCallbackSimple] Code in URL:', code ? 'YES' : 'NO');
+        // 2. Esperar a que exista sesión (máximo 15 segundos)
+        setMessage('Verificando sesión...');
+        console.log('[AuthCallbackSimple] Esperando sesión...');
+        
+        const sessionUser = await waitForSession(15000, alive);
+        
+        if (!alive) return;
+        
+        if (!sessionUser) {
+          throw new Error('No se pudo establecer la sesión. Por favor intentá de nuevo.');
+        }
 
+        console.log('[AuthCallbackSimple] ✅ Sesión encontrada:', sessionUser.email);
+        
+        // 3. Limpiar la URL
+        window.history.replaceState({}, document.title, '/auth/callback');
+        
         if (!alive) return;
 
-        const waitForSession = async (maxWaitMs: number, intervalMs: number) => {
-          const start = Date.now();
-          while (Date.now() - start < maxWaitMs) {
-            const { data, error } = await supabase.auth.getSession();
-            if (error) {
-              console.warn('[AuthCallbackSimple] Error getSession while waiting:', error);
-            }
-            if (data.session?.user) {
-              return data.session.user;
-            }
-            await new Promise(resolve => setTimeout(resolve, intervalMs));
-          }
-          return null;
-        };
+        // 4. Asegurar usuario en tabla users
+        setMessage('Configurando tu cuenta...');
+        console.log('[AuthCallbackSimple] Asegurando usuario en DB...');
+        
+        await ensureUserInDatabase(sessionUser);
+        
+        if (!alive) return;
 
-        if (code) {
-          // Si hay código, intentar intercambiarlo por sesión
-          setMessage('Intercambiando código de autenticación...');
-          console.log('[AuthCallbackSimple] Exchanging code for session...');
-
-          const withTimeout = async <T,>(promise: Promise<T>, ms: number, errorMessage: string) => {
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error(errorMessage)), ms);
-            });
-            return Promise.race([promise, timeoutPromise]);
-          };
-
-          let exchangeResult;
-          try {
-            exchangeResult = await withTimeout(
-              supabase.auth.exchangeCodeForSession(code),
-              10000,
-              'Timeout al intercambiar código'
-            );
-          } catch (err) {
-            console.warn('[AuthCallbackSimple] Exchange timeout/error, retrying once...', err);
-            const fallbackUser = await waitForSession(6000, 300);
-            if (fallbackUser) {
-              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange timeout:', fallbackUser.email);
-              window.history.replaceState({}, document.title, url.pathname);
-              if (!alive) return;
-              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
-              return;
-            }
-            exchangeResult = await withTimeout(
-              supabase.auth.exchangeCodeForSession(code),
-              10000,
-              'Timeout al intercambiar código (retry)'
-            );
-          }
-
-          const { data, error: exchangeError } = exchangeResult;
-          if (exchangeError) {
-            console.error('[AuthCallbackSimple] Error exchanging code:', exchangeError);
-            const fallbackUser = await waitForSession(6000, 300);
-            if (fallbackUser) {
-              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange error:', fallbackUser.email);
-              window.history.replaceState({}, document.title, url.pathname);
-              if (!alive) return;
-              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
-              return;
-            }
-            throw exchangeError;
-          }
-
-          if (!data.session || !data.session.user) {
-            const fallbackUser = await waitForSession(6000, 300);
-            if (fallbackUser) {
-              console.log('[AuthCallbackSimple] ✅ Session recovered after exchange empty:', fallbackUser.email);
-              window.history.replaceState({}, document.title, url.pathname);
-              if (!alive) return;
-              await handleUserProfile(fallbackUser, alive, setMessage, navigate);
-              return;
-            }
-            throw new Error('No se pudo obtener la sesión después del intercambio');
-          }
-
-          console.log('[AuthCallbackSimple] ✅ Code exchanged successfully:', data.session.user.email);
-
-          // Limpiar la URL
-          window.history.replaceState({}, document.title, url.pathname);
-
-          if (!alive) return;
-
-          // Procesar perfil del usuario
-          await handleUserProfile(data.session.user, alive, setMessage, navigate);
-        } else {
-          // No hay código, verificar si ya hay sesión
-          setMessage('Verificando sesión...');
-          console.log('[AuthCallbackSimple] No code, checking existing session...');
-          
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            console.error('[AuthCallbackSimple] Error getSession:', sessionError);
-            throw sessionError;
-          }
-
-          if (!session || !session.user) {
-            console.error('[AuthCallbackSimple] No session and no code');
-            throw new Error('No se encontró código de autenticación ni sesión activa');
-          }
-
-          console.log('[AuthCallbackSimple] ✅ Existing session found:', session.user.email);
-
-          if (!alive) return;
-          
-          // Procesar perfil del usuario
-          await handleUserProfile(session.user, alive, setMessage, navigate);
+        // 5. Determinar destino
+        setMessage('¡Listo! Redirigiendo...');
+        console.log('[AuthCallbackSimple] Determinando destino...');
+        
+        const destination = await resolveDestination(sessionUser);
+        
+        console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
+        console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
+        
+        if (alive) {
+          navigate(destination, { replace: true });
         }
 
       } catch (err) {
@@ -183,10 +106,39 @@ export function AuthCallbackSimple() {
       }
     };
 
+    /**
+     * Esperar a que exista sesión con polling
+     */
+    async function waitForSession(maxWaitMs: number, isAlive: boolean) {
+      const start = Date.now();
+      
+      while (Date.now() - start < maxWaitMs && isAlive) {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.warn('[AuthCallbackSimple] Error getSession:', error.message);
+          }
+          
+          if (data.session?.user) {
+            return data.session.user;
+          }
+        } catch (err) {
+          console.warn('[AuthCallbackSimple] Exception in getSession:', err);
+        }
+        
+        // Esperar 500ms antes del próximo intento
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      return null;
+    }
+
     handleCallback();
 
     return () => {
       alive = false;
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [navigate]);
 
@@ -212,97 +164,7 @@ export function AuthCallbackSimple() {
 }
 
 /**
- * Función auxiliar para crear/actualizar usuario en tabla users y redirigir
- */
-async function handleUserProfile(
-  user: any, 
-  alive: boolean, 
-  setMessage: (msg: string) => void, 
-  navigate: (path: string, options?: any) => void
-) {
-  try {
-    if (!alive) return;
-    
-    console.log('[AuthCallbackSimple] Usuario autenticado:', user.email);
-    setMessage('Configurando tu perfil...');
-
-    const withTimeout = async <T,>(promise: Promise<T>, ms: number, errorMessage: string) => {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(errorMessage)), ms);
-      });
-      return Promise.race([promise, timeoutPromise]);
-    };
-
-    // CRÍTICO: Asegurar que el usuario existe en la tabla users
-    await withTimeout(ensureUserInDatabase(user), 8000, 'Timeout al crear/actualizar usuario');
-    
-    if (!alive) return;
-    
-    setMessage('¡Listo! Redirigiendo...');
-
-    const loadDbUser = async () => {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data, error } = await supabase
-          .from('users')
-          .select('email, user_type, onboarding_completed')
-          .eq('id', user.id)
-          .single();
-
-        if (!error && data) return data;
-        if (error && error.code !== 'PGRST116') {
-          throw error;
-        }
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      return null;
-    };
-
-    const dbUser = await withTimeout(
-      loadDbUser(),
-      8000,
-      'Timeout al cargar el usuario desde la DB'
-    );
-
-    let destination = '/onboarding';
-    if (dbUser?.user_type === 'business') {
-      try {
-        const { data, error } = await supabase
-          .from('businesses')
-          .select('id')
-          .eq('email', dbUser.email)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          throw error;
-        }
-
-        destination = data?.id ? `/business/dashboard/${data.id}` : '/business/onboarding';
-      } catch (err) {
-        console.error('[AuthCallbackSimple] Error resolving business destination:', err);
-        destination = '/business/onboarding';
-      }
-    } else if (dbUser?.onboarding_completed) {
-      destination = '/chat';
-    }
-
-    console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
-    console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-    
-    // Pequeño delay para asegurar que la base de datos está actualizada
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    if (alive) {
-      navigate(destination, { replace: true });
-    }
-  } catch (err) {
-    console.error('[AuthCallbackSimple] Error en handleUserProfile:', err);
-    throw err;
-  }
-}
-
-/**
  * Asegurar que el usuario existe en la tabla users
- * Esta función crea o actualiza el registro del usuario en nuestra tabla custom
  */
 async function ensureUserInDatabase(authUser: any): Promise<void> {
   console.log('[AuthCallbackSimple] Verificando usuario en base de datos...');
@@ -320,7 +182,7 @@ async function ensureUserInDatabase(authUser: any): Promise<void> {
   // Verificar si el usuario ya existe
   const { data: existing, error: existingError } = await supabase
     .from('users')
-    .select('*')
+    .select('id')
     .eq('id', authUser.id)
     .maybeSingle();
 
@@ -349,6 +211,11 @@ async function ensureUserInDatabase(authUser: any): Promise<void> {
     });
     
     if (insertError) {
+      // Si el error es de duplicado, el usuario ya existe (race condition)
+      if (insertError.code === '23505') {
+        console.log('[AuthCallbackSimple] Usuario ya existe (race condition), continuando...');
+        return;
+      }
       console.error('[AuthCallbackSimple] Error creando usuario:', insertError);
       throw insertError;
     }
@@ -360,20 +227,57 @@ async function ensureUserInDatabase(authUser: any): Promise<void> {
     
     const { error: updateError } = await supabase
       .from('users')
-      .update({
-        last_login_at: now,
-        // Actualizar datos que puedan haber cambiado en Google
-        full_name: fullName || existing.full_name,
-        avatar_url: avatarUrl || existing.avatar_url,
-        google_id: googleId || existing.google_id,
-      })
+      .update({ last_login_at: now })
       .eq('id', authUser.id);
 
     if (updateError) {
-      console.error('[AuthCallbackSimple] Error actualizando usuario:', updateError);
-      throw updateError;
+      console.warn('[AuthCallbackSimple] Error actualizando usuario (no crítico):', updateError);
+    } else {
+      console.log('[AuthCallbackSimple] ✅ Usuario actualizado exitosamente');
     }
-    
-    console.log('[AuthCallbackSimple] ✅ Usuario actualizado exitosamente');
   }
+}
+
+/**
+ * Determinar destino según tipo de usuario y estado de onboarding
+ */
+async function resolveDestination(authUser: any): Promise<string> {
+  // Obtener datos del usuario de la DB
+  const { data: dbUser, error: dbError } = await supabase
+    .from('users')
+    .select('user_type, onboarding_completed, email')
+    .eq('id', authUser.id)
+    .single();
+
+  if (dbError || !dbUser) {
+    console.warn('[AuthCallbackSimple] No se pudo leer usuario de DB, enviando a onboarding');
+    return '/onboarding';
+  }
+
+  console.log('[AuthCallbackSimple] Usuario DB:', dbUser);
+
+  // Si es business, resolver destino business
+  if (dbUser.user_type === 'business') {
+    const { data: business, error: bizError } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('email', dbUser.email)
+      .single();
+
+    if (bizError && bizError.code !== 'PGRST116') {
+      console.warn('[AuthCallbackSimple] Error buscando business:', bizError);
+    }
+
+    if (business?.id) {
+      return `/business/dashboard/${business.id}`;
+    }
+    return '/business/onboarding';
+  }
+
+  // Consumer: verificar onboarding
+  if (dbUser.onboarding_completed) {
+    return '/chat';
+  }
+
+  return '/onboarding';
 }
