@@ -17,7 +17,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
-import { authService } from '../../services/auth.service';
 import { LoadingSpinner } from '../Shared/LoadingSpinner';
 
 /**
@@ -240,42 +239,37 @@ async function handleUserProfile(
     if (!alive) return;
     
     setMessage('¡Listo! Redirigiendo...');
-    
-    const loadFullUser = async () => {
+
+    const loadDbUser = async () => {
       for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const result = await authService.getFullUser();
-          if (result) return result;
-        } catch (err) {
-          const isAbort =
-            err instanceof Error &&
-            (err.name === 'AbortError' || err.message?.includes('aborted'));
-          if (!isAbort) {
-            throw err;
-          }
-          console.warn('[AuthCallbackSimple] getFullUser aborted, retrying...', err);
+        const { data, error } = await supabase
+          .from('users')
+          .select('email, user_type, onboarding_completed')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) return data;
+        if (error && error.code !== 'PGRST116') {
+          throw error;
         }
         await new Promise(resolve => setTimeout(resolve, 300));
       }
       return null;
     };
 
-    const fullUser = await withTimeout(
-      loadFullUser(),
+    const dbUser = await withTimeout(
+      loadDbUser(),
       8000,
-      'Timeout al cargar el perfil del usuario'
+      'Timeout al cargar el usuario desde la DB'
     );
-    if (!fullUser) {
-      throw new Error('No se pudo cargar el perfil del usuario');
-    }
 
-    let destination = fullUser.onboarding_completed ? '/chat' : '/onboarding';
-    if (fullUser.user_type === 'business') {
+    let destination = '/onboarding';
+    if (dbUser?.user_type === 'business') {
       try {
         const { data, error } = await supabase
           .from('businesses')
           .select('id')
-          .eq('email', fullUser.email)
+          .eq('email', dbUser.email)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -287,6 +281,8 @@ async function handleUserProfile(
         console.error('[AuthCallbackSimple] Error resolving business destination:', err);
         destination = '/business/onboarding';
       }
+    } else if (dbUser?.onboarding_completed) {
+      destination = '/chat';
     }
 
     console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
