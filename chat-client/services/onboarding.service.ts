@@ -82,17 +82,31 @@ export class OnboardingService {
       await this.savePaymentMethod(userId, payment);
     }
 
-    // Actualizar usuario como onboarding completado
+    // Obtener email del usuario autenticado para el UPSERT
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+
+    // UPSERT en lugar de UPDATE: crea la fila si el trigger no la creó
+    // (necesario cuando on_auth_user_created no dispara en replica mode)
     const { error: userError } = await supabase
       .from('users')
-      .update({ 
+      .upsert({
+        id: userId,
+        email: authUser?.email || '',
         onboarding_completed: true,
         full_name: identity.nickname,
         phone: identity.phone,
-      })
-      .eq('id', userId);
+        auth_provider: (authUser?.app_metadata?.provider as 'email' | 'google') || 'email',
+        is_active: true,
+        user_type: 'consumer',
+      }, { onConflict: 'id' });
 
     if (userError) throw userError;
+
+    // También actualizar auth metadata para que futuros logins rutéen correctamente
+    // sin depender de queries REST a public.users en el callback
+    await supabase.auth.updateUser({
+      data: { onboarding_completed: true, user_type: 'consumer' },
+    });
 
     return profile as UserProfile;
   }

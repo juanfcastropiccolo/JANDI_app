@@ -21,21 +21,21 @@ import type { User as CustomUser } from '../types/auth.types';
 export class AuthService {
   /**
    * Obtener usuario completo (Auth User + datos de tabla users)
-   * Esta función combina los datos del Auth User de Supabase con los datos
-   * de nuestra tabla users para tener un objeto completo con onboarding_completed
+   * Wraps la query de DB con un AbortController de 5s para evitar que
+   * el browser quede colgado si Supabase REST no responde (CORS preflight issue).
+   * Si la query falla o tarda demasiado, construye el usuario desde auth metadata.
    */
   async getFullUser(): Promise<CustomUser | null> {
     try {
       console.log('[AuthService] Getting full user...');
-      
-      // 1. Primero verificar si hay sesión activa
+
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
         console.error('[AuthService] Error getting session:', sessionError);
         return null;
       }
-      
+
       if (!session || !session.user) {
         console.log('[AuthService] No active session');
         return null;
@@ -44,57 +44,60 @@ export class AuthService {
       const authUser = session.user;
       console.log('[AuthService] Auth user found:', authUser.id, authUser.email);
 
-      // 2. Obtener datos de la tabla users
-      const { data: dbUser, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      // Intentar obtener datos de DB con timeout de 5s
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
 
-      if (dbError) {
-        console.error('[AuthService] Error fetching user from database:', dbError);
-        // Si falla la consulta de DB, devolver solo authUser con valores por defecto
-        console.warn('[AuthService] Returning auth user with default values');
-        return {
+      try {
+        const { data: dbUser, error: dbError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single()
+          .abortSignal(controller.signal);
+
+        clearTimeout(timer);
+
+        if (dbError) {
+          console.warn('[AuthService] DB query error, falling back to metadata:', dbError.message);
+          return buildUserFromMetadata(authUser);
+        }
+
+        console.log('[AuthService] DB user found, onboarding_completed:', dbUser.onboarding_completed);
+
+        const fullUser: CustomUser = {
           ...authUser,
-          onboarding_completed: false,
-          auth_provider: 'email',
-          is_active: true,
-        } as CustomUser;
+          ...dbUser,
+          onboarding_completed: dbUser.onboarding_completed ?? false,
+          full_name: dbUser.full_name,
+          phone: dbUser.phone,
+          auth_provider: dbUser.auth_provider,
+          is_active: dbUser.is_active,
+          user_type: dbUser.user_type || 'consumer',
+          metadata: dbUser.metadata || {},
+          email: authUser.email!,
+          id: authUser.id,
+        };
+
+        console.log('[AuthService] Full user assembled:', {
+          id: fullUser.id,
+          email: fullUser.email,
+          user_type: fullUser.user_type,
+          onboarding_completed: fullUser.onboarding_completed,
+        });
+
+        return fullUser;
+      } catch (abortErr) {
+        clearTimeout(timer);
+        console.warn('[AuthService] DB query timed out or aborted, falling back to metadata');
+        return buildUserFromMetadata(authUser);
       }
-
-      console.log('[AuthService] DB user found, onboarding_completed:', dbUser.onboarding_completed);
-
-      // 3. Combinar ambos (priorizar datos de la tabla users)
-      const fullUser: CustomUser = {
-        ...authUser,
-        ...dbUser,
-        // Asegurar que propiedades críticas vengan de la tabla users
-        onboarding_completed: dbUser.onboarding_completed ?? false,
-        full_name: dbUser.full_name,
-        phone: dbUser.phone,
-        auth_provider: dbUser.auth_provider,
-        is_active: dbUser.is_active,
-        user_type: dbUser.user_type || 'consumer', // ✅ Asegurar user_type
-        metadata: dbUser.metadata || {}, // Mantener metadata por si acaso
-        // Mantener propiedades de Auth que no están en la tabla
-        email: authUser.email!,
-        id: authUser.id,
-      };
-
-      console.log('[AuthService] Full user assembled:', {
-        id: fullUser.id,
-        email: fullUser.email,
-        user_type: fullUser.user_type,
-        onboarding_completed: fullUser.onboarding_completed,
-      });
-
-      return fullUser;
     } catch (error) {
       console.error('[AuthService] Error in getFullUser:', error);
       throw error;
     }
   }
+
   /**
    * Registrar nuevo usuario de negocio
    */
@@ -125,8 +128,7 @@ export class AuthService {
     });
 
     if (error) throw error;
-    
-    // Verificar que sea un usuario de tipo business
+
     if (data.user?.user_metadata?.user_type !== 'business') {
       throw new Error('Este usuario no es un negocio');
     }
@@ -169,6 +171,33 @@ export class AuthService {
     const { data: { session } } = await supabase.auth.getSession();
     return !!session;
   }
+}
+
+/**
+ * Construir CustomUser desde auth metadata cuando la DB no está disponible.
+ * Usa valores por defecto razonables para los campos de public.users.
+ */
+function buildUserFromMetadata(authUser: any): CustomUser {
+  const meta = authUser.user_metadata || {};
+  const now = new Date().toISOString();
+
+  console.log('[AuthService] Building user from auth metadata (DB fallback)');
+
+  return {
+    ...authUser,
+    id: authUser.id,
+    email: authUser.email!,
+    full_name: meta.full_name || meta.name || '',
+    avatar_url: meta.avatar_url || meta.picture,
+    auth_provider: 'google',
+    is_active: true,
+    onboarding_completed: meta.onboarding_completed === true,
+    user_type: (meta.user_type as 'consumer' | 'business') || 'consumer',
+    created_at: authUser.created_at || now,
+    updated_at: now,
+    last_login_at: now,
+    metadata: meta,
+  } as CustomUser;
 }
 
 export const authService = new AuthService();

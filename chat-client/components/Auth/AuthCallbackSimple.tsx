@@ -21,8 +21,10 @@ import { LoadingSpinner } from '../Shared/LoadingSpinner';
 
 /**
  * AuthCallbackSimple - Componente para OAuth callback
- * 
- * Usa onAuthStateChange para detectar la sesión de forma confiable
+ *
+ * Lee el destino desde auth metadata (JWT) en lugar de hacer REST a public.users.
+ * El trigger on_auth_user_created (ENABLE ALWAYS) se encarga de crear/actualizar
+ * public.users automáticamente cuando GoTrue procesa el login.
  */
 export function AuthCallbackSimple() {
   const navigate = useNavigate();
@@ -32,11 +34,11 @@ export function AuthCallbackSimple() {
 
   useEffect(() => {
     console.log('[AuthCallbackSimple] ===== INICIO DEL CALLBACK =====');
-    
+
     // Verificar si hay error en la URL
     const url = new URL(window.location.href);
     const errorParam = url.searchParams.get('error');
-    
+
     if (errorParam) {
       const errorDescription = url.searchParams.get('error_description');
       const msg = decodeURIComponent(errorDescription || errorParam);
@@ -57,97 +59,41 @@ export function AuthCallbackSimple() {
       }
     }, 20000);
 
+    const handleSession = (user: any) => {
+      if (processedRef.current) return;
+      processedRef.current = true;
+      clearTimeout(timeoutId);
+
+      console.log('[AuthCallbackSimple] ✅ Sesión detectada:', user.email);
+
+      window.history.replaceState({}, document.title, '/auth/callback');
+      setMessage('¡Listo! Redirigiendo...');
+
+      const destination = resolveDestinationFromMetadata(user);
+      console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
+      console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
+
+      navigate(destination, { replace: true });
+    };
+
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[AuthCallbackSimple] Auth event:', event, 'has session:', !!session);
-        
-        if (processedRef.current) {
-          console.log('[AuthCallbackSimple] Already processed, ignoring event');
-          return;
-        }
-
-        if (session?.user) {
-          processedRef.current = true;
-          clearTimeout(timeoutId);
-
-          console.log('[AuthCallbackSimple] ✅ Sesión detectada:', session.user.email);
-
-          // Timeout de 10s para las operaciones de DB (independiente del timeout de sesión)
-          const dbTimeoutId = setTimeout(() => {
-            console.error('[AuthCallbackSimple] ⏰ TIMEOUT en operaciones de DB - posible problema de red o RLS');
-            setError('No se pudo conectar con la base de datos. Verificá tu conexión e intentá de nuevo.');
-            setMessage('Error al configurar la cuenta');
-            setTimeout(() => navigate('/login', { replace: true }), 3000);
-          }, 10000);
-
-          try {
-            // Limpiar la URL
-            window.history.replaceState({}, document.title, '/auth/callback');
-
-            // Asegurar usuario en tabla users
-            setMessage('Configurando tu cuenta...');
-            await ensureUserInDatabase(session.user);
-
-            // Determinar destino
-            setMessage('¡Listo! Redirigiendo...');
-            const destination = await resolveDestination(session.user);
-
-            clearTimeout(dbTimeoutId);
-            console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
-            console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-
-            navigate(destination, { replace: true });
-          } catch (err) {
-            clearTimeout(dbTimeoutId);
-            console.error('[AuthCallbackSimple] Error procesando usuario:', err);
-            console.log('[AuthCallbackSimple] Fallback: enviando a /onboarding');
-            navigate('/onboarding', { replace: true });
-          }
-        }
+      (_event, session) => {
+        console.log('[AuthCallbackSimple] Auth event:', _event, 'has session:', !!session);
+        if (session?.user) handleSession(session.user);
       }
     );
 
-    // Verificar si ya hay sesión inmediatamente
-    // IMPORTANTE: si la sesión ya existe (el evento SIGNED_IN pudo haberse
-    // disparado antes de que este componente se suscribiera), la procesamos
-    // directamente aquí sin esperar onAuthStateChange.
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        console.warn('[AuthCallbackSimple] Error getSession inicial:', error);
+    // Verificar si ya hay sesión (race condition: evento disparado antes de suscribir)
+    supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (sessionError) {
+        console.warn('[AuthCallbackSimple] Error getSession inicial:', sessionError);
         return;
       }
-
-      if (data.session?.user && !processedRef.current) {
-        console.log('[AuthCallbackSimple] Sesión detectada via getSession, procesando directamente...');
-        processedRef.current = true;
-        clearTimeout(timeoutId);
-
-        const user = data.session.user;
-        window.history.replaceState({}, document.title, '/auth/callback');
-        setMessage('Configurando tu cuenta...');
-
-        const dbTimeoutId = setTimeout(() => {
-          console.error('[AuthCallbackSimple] ⏰ TIMEOUT en operaciones de DB (getSession path)');
-          setError('No se pudo conectar con la base de datos. Verificá tu conexión e intentá de nuevo.');
-          setMessage('Error al configurar la cuenta');
-          setTimeout(() => navigate('/login', { replace: true }), 3000);
-        }, 10000);
-
-        ensureUserInDatabase(user)
-          .then(() => resolveDestination(user))
-          .then((destination) => {
-            clearTimeout(dbTimeoutId);
-            setMessage('¡Listo! Redirigiendo...');
-            console.log('[AuthCallbackSimple] (getSession fallback) Redirigiendo a:', destination);
-            navigate(destination, { replace: true });
-          })
-          .catch((err) => {
-            clearTimeout(dbTimeoutId);
-            console.error('[AuthCallbackSimple] Error en getSession fallback:', err);
-            navigate('/onboarding', { replace: true });
-          });
-      } else if (!data.session) {
+      if (data.session?.user) {
+        console.log('[AuthCallbackSimple] Sesión detectada via getSession');
+        handleSession(data.session.user);
+      } else {
         console.log('[AuthCallbackSimple] Sin sesión aún, esperando onAuthStateChange...');
       }
     });
@@ -180,123 +126,24 @@ export function AuthCallbackSimple() {
 }
 
 /**
- * Asegurar que el usuario existe en la tabla users
+ * Determinar destino desde auth metadata (sin REST a public.users).
+ *
+ * El trigger on_auth_user_created escribe en public.users, pero el JWT
+ * ya contiene user_metadata con los datos necesarios para el routing.
+ * OnboardingService actualiza auth metadata al completar onboarding,
+ * por lo que onboarding_completed estará disponible en futuros logins.
  */
-async function ensureUserInDatabase(authUser: any): Promise<void> {
-  console.log('[AuthCallbackSimple] Verificando usuario en base de datos...');
-  console.log('[AuthCallbackSimple] Auth user id:', authUser.id, 'email:', authUser.email);
+function resolveDestinationFromMetadata(authUser: any): string {
+  const meta = authUser.user_metadata || {};
+  const userType = meta.user_type || 'consumer';
+  const onboardingCompleted = meta.onboarding_completed === true;
 
-  const email = authUser.email;
-  if (!email) {
-    throw new Error('No se encontró email en el usuario autenticado');
-  }
+  console.log('[AuthCallbackSimple] Metadata routing:', { userType, onboardingCompleted });
 
-  // Extraer datos del usuario de Google
-  const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name;
-  const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture;
-  const googleId = authUser.identities?.find((i: any) => i.provider === 'google')?.id;
-
-  // Verificar si el usuario ya existe
-  console.log('[AuthCallbackSimple] Ejecutando SELECT a public.users...');
-  const { data: existing, error: existingError } = await supabase
-    .from('users')
-    .select('id')
-    .eq('id', authUser.id)
-    .maybeSingle();
-  console.log('[AuthCallbackSimple] SELECT resultado:', { existing, existingError });
-
-  if (existingError) {
-    console.error('[AuthCallbackSimple] Error verificando usuario:', existingError);
-    throw existingError;
-  }
-
-  const now = new Date().toISOString();
-
-  if (!existing) {
-    // Usuario nuevo: crear registro
-    console.log('[AuthCallbackSimple] Usuario no existe, creando...');
-    
-    const { error: insertError } = await supabase.from('users').insert({
-      id: authUser.id,
-      email,
-      full_name: fullName,
-      avatar_url: avatarUrl,
-      google_id: googleId,
-      auth_provider: 'google',
-      onboarding_completed: false,
-      is_active: true,
-      last_login_at: now,
-      metadata: authUser.user_metadata || {},
-    });
-    
-    if (insertError) {
-      // Si el error es de duplicado, el usuario ya existe (race condition)
-      if (insertError.code === '23505') {
-        console.log('[AuthCallbackSimple] Usuario ya existe (race condition), continuando...');
-        return;
-      }
-      console.error('[AuthCallbackSimple] Error creando usuario:', insertError);
-      throw insertError;
-    }
-    
-    console.log('[AuthCallbackSimple] ✅ Usuario creado exitosamente');
-  } else {
-    // Usuario existente: actualizar last_login_at
-    console.log('[AuthCallbackSimple] Usuario existe, actualizando last_login...');
-    
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ last_login_at: now })
-      .eq('id', authUser.id);
-
-    if (updateError) {
-      console.warn('[AuthCallbackSimple] Error actualizando usuario (no crítico):', updateError);
-    } else {
-      console.log('[AuthCallbackSimple] ✅ Usuario actualizado exitosamente');
-    }
-  }
-}
-
-/**
- * Determinar destino según tipo de usuario y estado de onboarding
- */
-async function resolveDestination(authUser: any): Promise<string> {
-  // Obtener datos del usuario de la DB
-  const { data: dbUser, error: dbError } = await supabase
-    .from('users')
-    .select('user_type, onboarding_completed, email')
-    .eq('id', authUser.id)
-    .single();
-
-  if (dbError || !dbUser) {
-    console.warn('[AuthCallbackSimple] No se pudo leer usuario de DB, enviando a onboarding');
-    return '/onboarding';
-  }
-
-  console.log('[AuthCallbackSimple] Usuario DB:', dbUser);
-
-  // Si es business, resolver destino business
-  if (dbUser.user_type === 'business') {
-    const { data: business, error: bizError } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('email', dbUser.email)
-      .single();
-
-    if (bizError && bizError.code !== 'PGRST116') {
-      console.warn('[AuthCallbackSimple] Error buscando business:', bizError);
-    }
-
-    if (business?.id) {
-      return `/business/dashboard/${business.id}`;
-    }
+  if (userType === 'business') {
+    // Sin business_id en metadata, el guard del dashboard lo resolverá
     return '/business/onboarding';
   }
 
-  // Consumer: verificar onboarding
-  if (dbUser.onboarding_completed) {
-    return '/chat';
-  }
-
-  return '/onboarding';
+  return onboardingCompleted ? '/chat' : '/onboarding';
 }
