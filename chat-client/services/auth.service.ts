@@ -44,54 +44,55 @@ export class AuthService {
       const authUser = session.user;
       console.log('[AuthService] Auth user found:', authUser.id, authUser.email);
 
-      // Intentar obtener datos de DB con timeout de 5s
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      // Intentar obtener datos de DB con timeout de 5s usando Promise.race
+      const dbQuery = supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
 
-      try {
-        const { data: dbUser, error: dbError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single()
-          .abortSignal(controller.signal);
+      const timeoutPromise = new Promise<null>(resolve =>
+        setTimeout(() => resolve(null), 5000)
+      );
 
-        clearTimeout(timer);
+      const result = await Promise.race([dbQuery, timeoutPromise]);
 
-        if (dbError) {
-          console.warn('[AuthService] DB query error, falling back to metadata:', dbError.message);
-          return buildUserFromMetadata(authUser);
-        }
-
-        console.log('[AuthService] DB user found, onboarding_completed:', dbUser.onboarding_completed);
-
-        const fullUser: CustomUser = {
-          ...authUser,
-          ...dbUser,
-          onboarding_completed: dbUser.onboarding_completed ?? false,
-          full_name: dbUser.full_name,
-          phone: dbUser.phone,
-          auth_provider: dbUser.auth_provider,
-          is_active: dbUser.is_active,
-          user_type: dbUser.user_type || 'consumer',
-          metadata: dbUser.metadata || {},
-          email: authUser.email!,
-          id: authUser.id,
-        };
-
-        console.log('[AuthService] Full user assembled:', {
-          id: fullUser.id,
-          email: fullUser.email,
-          user_type: fullUser.user_type,
-          onboarding_completed: fullUser.onboarding_completed,
-        });
-
-        return fullUser;
-      } catch (abortErr) {
-        clearTimeout(timer);
-        console.warn('[AuthService] DB query timed out or aborted, falling back to metadata');
+      if (result === null) {
+        console.warn('[AuthService] DB query timed out, falling back to metadata');
         return buildUserFromMetadata(authUser);
       }
+
+      const { data: dbUser, error: dbError } = result as Awaited<typeof dbQuery>;
+
+      if (dbError) {
+        console.warn('[AuthService] DB query error, falling back to metadata:', dbError.message);
+        return buildUserFromMetadata(authUser);
+      }
+
+      console.log('[AuthService] DB user found, onboarding_completed:', dbUser.onboarding_completed);
+
+      const fullUser: CustomUser = {
+        ...authUser,
+        ...dbUser,
+        onboarding_completed: dbUser.onboarding_completed ?? false,
+        full_name: dbUser.full_name,
+        phone: dbUser.phone,
+        auth_provider: dbUser.auth_provider,
+        is_active: dbUser.is_active,
+        user_type: dbUser.user_type || 'consumer',
+        metadata: dbUser.metadata || {},
+        email: authUser.email!,
+        id: authUser.id,
+      };
+
+      console.log('[AuthService] Full user assembled:', {
+        id: fullUser.id,
+        email: fullUser.email,
+        user_type: fullUser.user_type,
+        onboarding_completed: fullUser.onboarding_completed,
+      });
+
+      return fullUser;
     } catch (error) {
       console.error('[AuthService] Error in getFullUser:', error);
       throw error;

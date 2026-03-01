@@ -27,15 +27,24 @@ export function useAuth() {
 
   useEffect(() => {
     console.log('[useAuth] Initializing auth hook...');
-    
-    // Obtener usuario completo al iniciar
-    authService.getFullUser().then(fullUser => {
-      console.log('[useAuth] Initial user loaded:', fullUser?.email, 'onboarding:', fullUser?.onboarding_completed);
-      setUser(fullUser);
+
+    // Setear usuario inmediatamente desde la sesión activa (no bloquea en DB)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const immediateUser = buildUserFromSession(session.user);
+        console.log('[useAuth] Initial user loaded:', immediateUser.email);
+        setUser(immediateUser);
+      }
       setLoading(false);
+      // Enriquecer con datos de DB en background (no-blocking)
+      authService.getFullUser().then(fullUser => {
+        if (fullUser) {
+          console.log('[useAuth] DB enrichment done:', fullUser.email, 'onboarding:', fullUser.onboarding_completed);
+          setUser(fullUser);
+        }
+      }).catch(() => {});
     }).catch(err => {
-      console.error('[useAuth] Error loading initial user:', err);
-      setUser(null);
+      console.error('[useAuth] Error getting initial session:', err);
       setLoading(false);
     });
 
@@ -43,22 +52,23 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         console.log('[useAuth] Auth state changed, event:', _event, 'has session:', !!session);
-        
+
         if (session?.user) {
-          // Obtener usuario completo cuando hay sesión
-          try {
-            const fullUser = await authService.getFullUser();
-            console.log('[useAuth] Full user loaded after auth change:', fullUser?.email, 'onboarding:', fullUser?.onboarding_completed);
-            setUser(fullUser);
-          } catch (err) {
-            console.error('[useAuth] Error loading full user after auth change:', err);
-            setUser(null);
-          }
+          // Setear user INMEDIATAMENTE desde el JWT (sin esperar DB)
+          setUser(buildUserFromSession(session.user));
+          setLoading(false);
+          // Enriquecer con DB en background
+          authService.getFullUser().then(fullUser => {
+            if (fullUser) {
+              console.log('[useAuth] Full user loaded after auth change:', fullUser.email, 'onboarding:', fullUser.onboarding_completed);
+              setUser(fullUser);
+            }
+          }).catch(() => {});
         } else {
           console.log('[useAuth] No session, clearing user');
           setUser(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -193,5 +203,24 @@ export function useAuth() {
     logout,
     resetPassword,
     refetchUser,
+  };
+}
+
+function buildUserFromSession(authUser: any): User {
+  const meta = authUser.user_metadata || {};
+  const now = new Date().toISOString();
+  return {
+    ...authUser,
+    id: authUser.id,
+    email: authUser.email!,
+    full_name: meta.full_name || meta.name || '',
+    avatar_url: meta.avatar_url || meta.picture,
+    auth_provider: (authUser.app_metadata?.provider === 'google' ? 'google' : 'email') as 'email' | 'google',
+    is_active: true,
+    onboarding_completed: meta.onboarding_completed === true,
+    user_type: (meta.user_type as 'consumer' | 'business') || 'consumer',
+    created_at: authUser.created_at || now,
+    updated_at: now,
+    metadata: meta,
   };
 }
