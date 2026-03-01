@@ -70,28 +70,37 @@ export function AuthCallbackSimple() {
         if (session?.user) {
           processedRef.current = true;
           clearTimeout(timeoutId);
-          
+
           console.log('[AuthCallbackSimple] ✅ Sesión detectada:', session.user.email);
-          
+
+          // Timeout de 10s para las operaciones de DB (independiente del timeout de sesión)
+          const dbTimeoutId = setTimeout(() => {
+            console.error('[AuthCallbackSimple] ⏰ TIMEOUT en operaciones de DB - posible problema de red o RLS');
+            setError('No se pudo conectar con la base de datos. Verificá tu conexión e intentá de nuevo.');
+            setMessage('Error al configurar la cuenta');
+            setTimeout(() => navigate('/login', { replace: true }), 3000);
+          }, 10000);
+
           try {
             // Limpiar la URL
             window.history.replaceState({}, document.title, '/auth/callback');
-            
+
             // Asegurar usuario en tabla users
             setMessage('Configurando tu cuenta...');
             await ensureUserInDatabase(session.user);
-            
+
             // Determinar destino
             setMessage('¡Listo! Redirigiendo...');
             const destination = await resolveDestination(session.user);
-            
+
+            clearTimeout(dbTimeoutId);
             console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
             console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-            
+
             navigate(destination, { replace: true });
           } catch (err) {
+            clearTimeout(dbTimeoutId);
             console.error('[AuthCallbackSimple] Error procesando usuario:', err);
-            // Si falla algo, igual mandamos a onboarding
             console.log('[AuthCallbackSimple] Fallback: enviando a /onboarding');
             navigate('/onboarding', { replace: true });
           }
@@ -118,14 +127,23 @@ export function AuthCallbackSimple() {
         window.history.replaceState({}, document.title, '/auth/callback');
         setMessage('Configurando tu cuenta...');
 
+        const dbTimeoutId = setTimeout(() => {
+          console.error('[AuthCallbackSimple] ⏰ TIMEOUT en operaciones de DB (getSession path)');
+          setError('No se pudo conectar con la base de datos. Verificá tu conexión e intentá de nuevo.');
+          setMessage('Error al configurar la cuenta');
+          setTimeout(() => navigate('/login', { replace: true }), 3000);
+        }, 10000);
+
         ensureUserInDatabase(user)
           .then(() => resolveDestination(user))
           .then((destination) => {
+            clearTimeout(dbTimeoutId);
             setMessage('¡Listo! Redirigiendo...');
             console.log('[AuthCallbackSimple] (getSession fallback) Redirigiendo a:', destination);
             navigate(destination, { replace: true });
           })
           .catch((err) => {
+            clearTimeout(dbTimeoutId);
             console.error('[AuthCallbackSimple] Error en getSession fallback:', err);
             navigate('/onboarding', { replace: true });
           });
@@ -166,7 +184,8 @@ export function AuthCallbackSimple() {
  */
 async function ensureUserInDatabase(authUser: any): Promise<void> {
   console.log('[AuthCallbackSimple] Verificando usuario en base de datos...');
-  
+  console.log('[AuthCallbackSimple] Auth user id:', authUser.id, 'email:', authUser.email);
+
   const email = authUser.email;
   if (!email) {
     throw new Error('No se encontró email en el usuario autenticado');
@@ -178,11 +197,13 @@ async function ensureUserInDatabase(authUser: any): Promise<void> {
   const googleId = authUser.identities?.find((i: any) => i.provider === 'google')?.id;
 
   // Verificar si el usuario ya existe
+  console.log('[AuthCallbackSimple] Ejecutando SELECT a public.users...');
   const { data: existing, error: existingError } = await supabase
     .from('users')
     .select('id')
     .eq('id', authUser.id)
     .maybeSingle();
+  console.log('[AuthCallbackSimple] SELECT resultado:', { existing, existingError });
 
   if (existingError) {
     console.error('[AuthCallbackSimple] Error verificando usuario:', existingError);
