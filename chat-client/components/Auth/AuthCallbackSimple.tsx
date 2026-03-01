@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import { LoadingSpinner } from '../Shared/LoadingSpinner';
@@ -22,123 +22,121 @@ import { LoadingSpinner } from '../Shared/LoadingSpinner';
 /**
  * AuthCallbackSimple - Componente para OAuth callback
  * 
- * Estrategia simple y robusta:
- * 1. Esperar a que exista sesión (Supabase la crea automáticamente)
- * 2. Asegurar usuario en tabla users
- * 3. Redirigir según tipo de usuario
+ * Usa onAuthStateChange para detectar la sesión de forma confiable
  */
 export function AuthCallbackSimple() {
   const navigate = useNavigate();
   const [message, setMessage] = useState('Procesando autenticación...');
   const [error, setError] = useState<string | null>(null);
+  const processedRef = useRef(false);
 
   useEffect(() => {
-    let alive = true;
-    let pollInterval: NodeJS.Timeout | null = null;
-
-    const handleCallback = async () => {
-      try {
-        console.log('[AuthCallbackSimple] ===== INICIO DEL CALLBACK =====');
-        
-        // 1. Verificar si hay error en la URL
-        const url = new URL(window.location.href);
-        const errorParam = url.searchParams.get('error');
-        
-        if (errorParam) {
-          const errorDescription = url.searchParams.get('error_description');
-          const msg = decodeURIComponent(errorDescription || errorParam);
-          console.error('[AuthCallbackSimple] Error OAuth:', msg);
-          throw new Error(msg);
-        }
-
-        // 2. Esperar a que exista sesión (máximo 15 segundos)
-        setMessage('Verificando sesión...');
-        console.log('[AuthCallbackSimple] Esperando sesión...');
-        
-        const sessionUser = await waitForSession(15000, alive);
-        
-        if (!alive) return;
-        
-        if (!sessionUser) {
-          throw new Error('No se pudo establecer la sesión. Por favor intentá de nuevo.');
-        }
-
-        console.log('[AuthCallbackSimple] ✅ Sesión encontrada:', sessionUser.email);
-        
-        // 3. Limpiar la URL
-        window.history.replaceState({}, document.title, '/auth/callback');
-        
-        if (!alive) return;
-
-        // 4. Asegurar usuario en tabla users
-        setMessage('Configurando tu cuenta...');
-        console.log('[AuthCallbackSimple] Asegurando usuario en DB...');
-        
-        await ensureUserInDatabase(sessionUser);
-        
-        if (!alive) return;
-
-        // 5. Determinar destino
-        setMessage('¡Listo! Redirigiendo...');
-        console.log('[AuthCallbackSimple] Determinando destino...');
-        
-        const destination = await resolveDestination(sessionUser);
-        
-        console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
-        console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
-        
-        if (alive) {
-          navigate(destination, { replace: true });
-        }
-
-      } catch (err) {
-        console.error('[AuthCallbackSimple] ===== ERROR EN CALLBACK =====', err);
-        
-        if (!alive) return;
-
-        const errorMessage = err instanceof Error ? err.message : 'Error al procesar autenticación';
-        setError(errorMessage);
-        setMessage('Error al iniciar sesión');
-
-        setTimeout(() => {
-          if (alive) navigate('/login', { replace: true });
-        }, 3000);
-      }
-    };
-
-    /**
-     * Esperar a que exista sesión con polling
-     */
-    async function waitForSession(maxWaitMs: number, isAlive: boolean) {
-      const start = Date.now();
-      
-      while (Date.now() - start < maxWaitMs && isAlive) {
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.warn('[AuthCallbackSimple] Error getSession:', error.message);
-          }
-          
-          if (data.session?.user) {
-            return data.session.user;
-          }
-        } catch (err) {
-          console.warn('[AuthCallbackSimple] Exception in getSession:', err);
-        }
-        
-        // Esperar 500ms antes del próximo intento
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      return null;
+    console.log('[AuthCallbackSimple] ===== INICIO DEL CALLBACK =====');
+    
+    // Verificar si hay error en la URL
+    const url = new URL(window.location.href);
+    const errorParam = url.searchParams.get('error');
+    
+    if (errorParam) {
+      const errorDescription = url.searchParams.get('error_description');
+      const msg = decodeURIComponent(errorDescription || errorParam);
+      console.error('[AuthCallbackSimple] Error OAuth:', msg);
+      setError(msg);
+      setMessage('Error al iniciar sesión');
+      setTimeout(() => navigate('/login', { replace: true }), 3000);
+      return;
     }
 
-    handleCallback();
+    // Timeout de seguridad: si en 20 segundos no hay sesión, fallar
+    const timeoutId = setTimeout(() => {
+      if (!processedRef.current) {
+        console.error('[AuthCallbackSimple] Timeout esperando sesión');
+        setError('Timeout esperando la sesión. Por favor intentá de nuevo.');
+        setMessage('Error al iniciar sesión');
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
+      }
+    }, 20000);
+
+    // Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[AuthCallbackSimple] Auth event:', event, 'has session:', !!session);
+        
+        if (processedRef.current) {
+          console.log('[AuthCallbackSimple] Already processed, ignoring event');
+          return;
+        }
+
+        if (session?.user) {
+          processedRef.current = true;
+          clearTimeout(timeoutId);
+          
+          console.log('[AuthCallbackSimple] ✅ Sesión detectada:', session.user.email);
+          
+          try {
+            // Limpiar la URL
+            window.history.replaceState({}, document.title, '/auth/callback');
+            
+            // Asegurar usuario en tabla users
+            setMessage('Configurando tu cuenta...');
+            await ensureUserInDatabase(session.user);
+            
+            // Determinar destino
+            setMessage('¡Listo! Redirigiendo...');
+            const destination = await resolveDestination(session.user);
+            
+            console.log('[AuthCallbackSimple] Redirigiendo a:', destination);
+            console.log('[AuthCallbackSimple] ===== FIN DEL CALLBACK (ÉXITO) =====');
+            
+            navigate(destination, { replace: true });
+          } catch (err) {
+            console.error('[AuthCallbackSimple] Error procesando usuario:', err);
+            // Si falla algo, igual mandamos a onboarding
+            console.log('[AuthCallbackSimple] Fallback: enviando a /onboarding');
+            navigate('/onboarding', { replace: true });
+          }
+        }
+      }
+    );
+
+    // Verificar si ya hay sesión inmediatamente
+    // IMPORTANTE: si la sesión ya existe (el evento SIGNED_IN pudo haberse
+    // disparado antes de que este componente se suscribiera), la procesamos
+    // directamente aquí sin esperar onAuthStateChange.
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.warn('[AuthCallbackSimple] Error getSession inicial:', error);
+        return;
+      }
+
+      if (data.session?.user && !processedRef.current) {
+        console.log('[AuthCallbackSimple] Sesión detectada via getSession, procesando directamente...');
+        processedRef.current = true;
+        clearTimeout(timeoutId);
+
+        const user = data.session.user;
+        window.history.replaceState({}, document.title, '/auth/callback');
+        setMessage('Configurando tu cuenta...');
+
+        ensureUserInDatabase(user)
+          .then(() => resolveDestination(user))
+          .then((destination) => {
+            setMessage('¡Listo! Redirigiendo...');
+            console.log('[AuthCallbackSimple] (getSession fallback) Redirigiendo a:', destination);
+            navigate(destination, { replace: true });
+          })
+          .catch((err) => {
+            console.error('[AuthCallbackSimple] Error en getSession fallback:', err);
+            navigate('/onboarding', { replace: true });
+          });
+      } else if (!data.session) {
+        console.log('[AuthCallbackSimple] Sin sesión aún, esperando onAuthStateChange...');
+      }
+    });
 
     return () => {
-      alive = false;
-      if (pollInterval) clearInterval(pollInterval);
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
     };
   }, [navigate]);
 

@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "../../../new_marketplace"
+		},
+		{
+			"path": "../../../seller_agent"
+		},
+		{
+			"path": "../../../consumer_agent"
+		},
+		{
+			"path": "../../../business_agent"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
